@@ -6,12 +6,13 @@ A static GitHub Pages site for reverse-looking-up Don't Starve Together Crock Po
 
 - Search ingredients by English name, Chinese name, or internal id.
 - Filter ingredients by common Crock Pot groups such as meat, fish, vegetable, fruit, egg, sweetener, monster, inedible, and filler/other.
-- Select up to four ingredients and view recipes that can be made by a real four-slot combo containing all selected ingredients.
+- Select up to four ingredient slots, including repeated ingredients, and view recipes that can be made by a real four-slot combo containing all selected slots.
+- Start with Monster Meat selected and show common ingredients first in the default ingredient list.
 - Prioritize recipes that explicitly require the selected ingredient before coefficient/filler matches.
 - Show readable Chinese recipe requirements such as `肉類係數 >= 3` and `不可放 不可食用`.
 - Render recipe requirement chips with ingredient/tag icons instead of random example filler combos.
 - Show ingredient and recipe icons from the Food Guide image set.
-- Show health, hunger, and sanity with Don't Starve wiki status icons.
+- Show health, hunger, and sanity with local Don't Starve-style status icons.
 - Keep English names while adding Traditional Chinese `zhName` fields.
 - Filter Warly-only recipes and sort by name, hunger, health, sanity, or priority.
 
@@ -60,10 +61,10 @@ Image assets are loaded from:
 https://bluehexagons.github.io/foodguide/img/
 ```
 
-Status icons are loaded through wiki.gg file redirects:
+Status icons are stored as local page assets:
 
 ```text
-https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Health_Meter.png
-https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Hunger_Meter.png
-https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Sanity_Meter.png
+assets/status-health.png
+assets/status-hunger.png
+assets/status-sanity.png
 ```

@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704b';
+const DATA_VERSION = '20260704c';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -34,17 +34,42 @@ const FILLER_EXCLUDED_TAGS = new Set([
 	'veggie',
 ]);
 
+const COMMON_INGREDIENT_IDS = [
+	'monstermeat',
+	'meat',
+	'morsel',
+	'bird_egg',
+	'honey',
+	'berries',
+	'carrot',
+	'twigs',
+	'ice',
+	'fishmeat',
+	'froglegs',
+	'drumstick',
+	'corn',
+	'pumpkin',
+	'dragonfruit',
+	'potato',
+	'tomato',
+	'kelp',
+];
+
+const COMMON_INGREDIENT_RANK = new Map(
+	COMMON_INGREDIENT_IDS.map((id, index) => [id, index]),
+);
+
 const STAT_META = {
 	health: {
-		iconUrl: 'https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Health_Meter.png',
+		iconUrl: 'assets/status-health.png',
 		label: '生命',
 	},
 	hunger: {
-		iconUrl: 'https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Hunger_Meter.png',
+		iconUrl: 'assets/status-hunger.png',
 		label: '飽食',
 	},
 	sanity: {
-		iconUrl: 'https://dontstarve.wiki.gg/wiki/Special:Redirect/file/Sanity_Meter.png',
+		iconUrl: 'assets/status-sanity.png',
 		label: '理智',
 	},
 };
@@ -186,7 +211,7 @@ function prepareData(data) {
 }
 
 function pickDefaultIngredient(ingredients) {
-	return ingredients.find(ingredient => ingredient.id === 'berries')?.key ?? ingredients[0]?.key ?? '';
+	return ingredients.find(ingredient => ingredient.id === 'monstermeat')?.key ?? ingredients[0]?.key ?? '';
 }
 
 function render() {
@@ -235,7 +260,9 @@ function renderIngredientList() {
 	}
 
 	const fragment = document.createDocumentFragment();
-	const ingredients = state.data.ingredients.filter(matchesIngredientFilters);
+	const ingredients = sortedIngredientsForActiveView(
+		state.data.ingredients.filter(matchesIngredientFilters),
+	);
 	const previousScrollTop = els.ingredientList.scrollTop;
 	els.ingredientList.innerHTML = '';
 
@@ -250,7 +277,7 @@ function renderIngredientList() {
 		node.querySelector('.ingredient-option-subtitle').textContent = ingredient.name;
 		node.querySelector('.ingredient-option-count').textContent = visibleRecipeCount(ingredient);
 		node.addEventListener('click', () => {
-			toggleIngredient(ingredient.key);
+			addIngredient(ingredient.key);
 			renderAll();
 		});
 		fragment.append(node);
@@ -258,6 +285,25 @@ function renderIngredientList() {
 
 	els.ingredientList.append(fragment);
 	els.ingredientList.scrollTop = previousScrollTop;
+}
+
+function sortedIngredientsForActiveView(ingredients) {
+	if (state.category !== 'all' || state.search) {
+		return ingredients;
+	}
+
+	return [...ingredients].sort(compareCommonIngredients);
+}
+
+function compareCommonIngredients(a, b) {
+	const rankA = COMMON_INGREDIENT_RANK.get(a.id) ?? Number.POSITIVE_INFINITY;
+	const rankB = COMMON_INGREDIENT_RANK.get(b.id) ?? Number.POSITIVE_INFINITY;
+
+	if (rankA !== rankB) {
+		return rankA - rankB;
+	}
+
+	return displayName(a).localeCompare(displayName(b), 'zh-Hant');
 }
 
 function categoryIngredientCount(category) {
@@ -333,18 +379,17 @@ function matchesIngredientSearch(ingredient) {
 	);
 }
 
-function toggleIngredient(key) {
-	if (state.selectedKeys.includes(key)) {
-		state.selectedKeys = state.selectedKeys.filter(selectedKey => selectedKey !== key);
-		return;
-	}
-
+function addIngredient(key) {
 	if (state.selectedKeys.length >= 4) {
 		state.selectedKeys = [...state.selectedKeys.slice(1), key];
 		return;
 	}
 
 	state.selectedKeys = [...state.selectedKeys, key];
+}
+
+function removeSelectedIngredient(index) {
+	state.selectedKeys = state.selectedKeys.filter((_, selectedIndex) => selectedIndex !== index);
 }
 
 function selectedIngredientObjects() {
@@ -920,16 +965,17 @@ function renderSharedTags(selectedIngredients) {
 
 function renderSelectedChips(selectedIngredients) {
 	const fragment = document.createDocumentFragment();
-	for (const ingredient of selectedIngredients) {
+	for (const [index, ingredient] of selectedIngredients.entries()) {
 		const chip = document.createElement('button');
 		chip.className = 'selected-chip';
 		chip.type = 'button';
+		chip.title = `移除 ${displayName(ingredient)}`;
 		chip.append(renderImage(ingredient, 'selected-chip-image'));
 		const label = document.createElement('span');
 		label.textContent = displayName(ingredient);
 		chip.append(label);
 		chip.addEventListener('click', () => {
-			toggleIngredient(ingredient.key);
+			removeSelectedIngredient(index);
 			renderAll();
 		});
 		fragment.append(chip);
