@@ -2,7 +2,7 @@ const DATA_URL = 'data/lookup.json';
 
 const state = {
 	data: null,
-	selectedKey: '',
+	selectedKeys: [],
 	search: '',
 	includeWarly: true,
 	sort: 'name',
@@ -13,9 +13,11 @@ const els = {
 	search: document.querySelector('#ingredient-search'),
 	includeWarly: document.querySelector('#include-warly'),
 	sort: document.querySelector('#recipe-sort'),
+	clearSelection: document.querySelector('#clear-selection'),
 	ingredientList: document.querySelector('#ingredient-list'),
 	ingredientName: document.querySelector('#ingredient-name'),
 	ingredientTags: document.querySelector('#ingredient-tags'),
+	selectedIngredients: document.querySelector('#selected-ingredients'),
 	resultCount: document.querySelector('#result-count'),
 	recipeGrid: document.querySelector('#recipe-grid'),
 	ingredientTemplate: document.querySelector('#ingredient-template'),
@@ -35,7 +37,7 @@ async function init() {
 
 		const data = await response.json();
 		state.data = prepareData(data);
-		state.selectedKey = pickDefaultIngredient(state.data.ingredients);
+		state.selectedKeys = [pickDefaultIngredient(state.data.ingredients)];
 		render();
 	} catch (error) {
 		els.status.textContent = '資料載入失敗';
@@ -51,12 +53,17 @@ function bindControls() {
 
 	els.includeWarly.addEventListener('change', event => {
 		state.includeWarly = event.target.checked;
-		renderSelectedIngredient();
+		renderAll();
 	});
 
 	els.sort.addEventListener('change', event => {
 		state.sort = event.target.value;
-		renderSelectedIngredient();
+		renderSelectionResults();
+	});
+
+	els.clearSelection.addEventListener('click', () => {
+		state.selectedKeys = [];
+		renderAll();
 	});
 }
 
@@ -69,11 +76,15 @@ function prepareData(data) {
 		edgeMap.get(edge.ingredientKey).push(edge);
 	}
 
-	const ingredients = [...data.ingredients].sort((a, b) => a.name.localeCompare(b.name));
+	const ingredients = [...data.ingredients].sort((a, b) =>
+		displayName(a).localeCompare(displayName(b), 'zh-Hant'),
+	);
+	const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.key, ingredient]));
 
 	return {
 		...data,
 		ingredients,
+		ingredientMap,
 		edgeMap,
 	};
 }
@@ -84,8 +95,12 @@ function pickDefaultIngredient(ingredients) {
 
 function render() {
 	els.status.textContent = `${state.data.ingredients.length} ingredients · ${Object.keys(state.data.recipes).length} recipes`;
+	renderAll();
+}
+
+function renderAll() {
 	renderIngredientList();
-	renderSelectedIngredient();
+	renderSelectionResults();
 }
 
 function renderIngredientList() {
@@ -99,15 +114,17 @@ function renderIngredientList() {
 
 	for (const ingredient of ingredients) {
 		const node = els.ingredientTemplate.content.firstElementChild.cloneNode(true);
+		const active = state.selectedKeys.includes(ingredient.key);
 		node.dataset.key = ingredient.key;
-		node.classList.toggle('is-active', ingredient.key === state.selectedKey);
-		node.setAttribute('aria-selected', String(ingredient.key === state.selectedKey));
-		node.querySelector('.ingredient-option-name').textContent = ingredient.name;
+		node.classList.toggle('is-active', active);
+		node.setAttribute('aria-selected', String(active));
+		node.querySelector('.ingredient-thumb').append(renderImage(ingredient, 'ingredient-thumb-image'));
+		node.querySelector('.ingredient-option-name').textContent = displayName(ingredient);
+		node.querySelector('.ingredient-option-subtitle').textContent = ingredient.name;
 		node.querySelector('.ingredient-option-count').textContent = visibleRecipeCount(ingredient);
 		node.addEventListener('click', () => {
-			state.selectedKey = ingredient.key;
-			renderIngredientList();
-			renderSelectedIngredient();
+			toggleIngredient(ingredient.key);
+			renderAll();
 		});
 		fragment.append(node);
 	}
@@ -115,35 +132,37 @@ function renderIngredientList() {
 	els.ingredientList.append(fragment);
 }
 
-function renderSelectedIngredient() {
+function renderSelectionResults() {
 	if (!state.data) {
 		return;
 	}
 
-	const ingredient = state.data.ingredients.find(item => item.key === state.selectedKey);
-	if (!ingredient) {
-		els.ingredientName.textContent = '-';
-		els.ingredientTags.innerHTML = '';
-		els.resultCount.textContent = '0 recipes';
-		els.recipeGrid.innerHTML = '<div class="empty-state">沒有符合的食材</div>';
+	const selectedIngredients = selectedIngredientObjects();
+	const resultEdges = sortedEdges(intersectionEdges(selectedIngredients));
+	els.ingredientName.textContent = selectedIngredients.length
+		? `${selectedIngredients.length} 個食材`
+		: '尚未選擇';
+	els.ingredientTags.innerHTML = '';
+	els.ingredientTags.append(renderSharedTags(selectedIngredients));
+	els.selectedIngredients.innerHTML = '';
+	els.selectedIngredients.append(renderSelectedChips(selectedIngredients));
+	els.resultCount.textContent = `${resultEdges.length} recipes`;
+	els.clearSelection.disabled = selectedIngredients.length === 0;
+	els.recipeGrid.innerHTML = '';
+
+	if (selectedIngredients.length === 0) {
+		els.recipeGrid.innerHTML = '<div class="empty-state">選擇食材後會顯示料理交集</div>';
 		return;
 	}
 
-	const edges = sortedEdges(visibleEdgesFor(ingredient));
-	els.ingredientName.textContent = ingredient.name;
-	els.ingredientTags.innerHTML = '';
-	els.ingredientTags.append(renderTags(ingredient.tags));
-	els.resultCount.textContent = `${edges.length} recipes`;
-	els.recipeGrid.innerHTML = '';
-
-	if (edges.length === 0) {
-		els.recipeGrid.innerHTML = '<div class="empty-state">這個篩選沒有可顯示的料理</div>';
+	if (resultEdges.length === 0) {
+		els.recipeGrid.innerHTML = '<div class="empty-state">這組食材目前沒有共同料理結果</div>';
 		return;
 	}
 
 	const fragment = document.createDocumentFragment();
-	for (const edge of edges) {
-		fragment.append(renderRecipeCard(edge));
+	for (const edge of resultEdges) {
+		fragment.append(renderRecipeCard(edge, selectedIngredients));
 	}
 	els.recipeGrid.append(fragment);
 }
@@ -155,16 +174,37 @@ function matchesIngredientSearch(ingredient) {
 
 	return (
 		ingredient.name.toLowerCase().includes(state.search) ||
+		ingredient.zhName.toLowerCase().includes(state.search) ||
 		ingredient.id.toLowerCase().includes(state.search) ||
 		ingredient.key.toLowerCase().includes(state.search)
 	);
 }
 
-function visibleRecipeCount(ingredient) {
-	return visibleEdgesFor(ingredient).length;
+function toggleIngredient(key) {
+	if (state.selectedKeys.includes(key)) {
+		state.selectedKeys = state.selectedKeys.filter(selectedKey => selectedKey !== key);
+		return;
+	}
+
+	if (state.selectedKeys.length >= 4) {
+		state.selectedKeys = [...state.selectedKeys.slice(1), key];
+		return;
+	}
+
+	state.selectedKeys = [...state.selectedKeys, key];
 }
 
-function visibleEdgesFor(ingredient) {
+function selectedIngredientObjects() {
+	return state.selectedKeys
+		.map(key => state.data.ingredientMap.get(key))
+		.filter(Boolean);
+}
+
+function visibleRecipeCount(ingredient) {
+	return visibleEdgesForIngredient(ingredient).length;
+}
+
+function visibleEdgesForIngredient(ingredient) {
 	const edges = state.data.edgeMap.get(ingredient.key) ?? [];
 	if (state.includeWarly) {
 		return edges;
@@ -173,60 +213,153 @@ function visibleEdgesFor(ingredient) {
 	return edges.filter(edge => !state.data.recipes[edge.recipeId]?.characterRequired);
 }
 
+function intersectionEdges(selectedIngredients) {
+	if (selectedIngredients.length === 0) {
+		return [];
+	}
+
+	const edgeGroups = selectedIngredients.map(ingredient => visibleEdgesForIngredient(ingredient));
+	const recipeSets = edgeGroups.map(edges => new Set(edges.map(edge => edge.recipeId)));
+	const commonRecipeIds = [...recipeSets[0]].filter(recipeId =>
+		recipeSets.every(set => set.has(recipeId)),
+	);
+
+	return commonRecipeIds.map(recipeId => {
+		const relatedEdges = edgeGroups
+			.map(edges => edges.find(edge => edge.recipeId === recipeId))
+			.filter(Boolean);
+		const edge = bestExampleEdge(relatedEdges, selectedIngredients);
+		return {
+			...edge,
+			relatedEdges,
+		};
+	});
+}
+
+function bestExampleEdge(edges, selectedIngredients) {
+	let best = edges[0];
+	let bestScore = -1;
+	const selectedIds = new Set(selectedIngredients.map(ingredient => ingredient.id));
+	const selectedKeys = new Set(selectedIngredients.map(ingredient => ingredient.key));
+
+	for (const edge of edges) {
+		const comboIds = new Set(edge.exampleCombo.map(item => item.id));
+		const comboKeys = new Set(edge.exampleCombo.map(item => item.key));
+		const score = [...selectedIds].filter(id => comboIds.has(id)).length +
+			[...selectedKeys].filter(key => comboKeys.has(key)).length;
+
+		if (score > bestScore) {
+			best = edge;
+			bestScore = score;
+		}
+	}
+
+	return best;
+}
+
 function sortedEdges(edges) {
 	return [...edges].sort((a, b) => {
 		const recipeA = state.data.recipes[a.recipeId];
 		const recipeB = state.data.recipes[b.recipeId];
 
 		if (state.sort === 'priority') {
-			return recipeB.priority - recipeA.priority || recipeA.name.localeCompare(recipeB.name);
+			return recipeB.priority - recipeA.priority || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
 		}
 
 		if (state.sort === 'hunger') {
-			return Number(recipeB.hunger || 0) - Number(recipeA.hunger || 0) || recipeA.name.localeCompare(recipeB.name);
+			return Number(recipeB.hunger || 0) - Number(recipeA.hunger || 0) || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
 		}
 
 		return (
 			Number(Boolean(recipeA.characterRequired)) - Number(Boolean(recipeB.characterRequired)) ||
-			recipeA.name.localeCompare(recipeB.name)
+			displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant')
 		);
 	});
 }
 
-function renderRecipeCard(edge) {
+function renderRecipeCard(edge, selectedIngredients) {
 	const recipe = state.data.recipes[edge.recipeId];
 	const node = els.recipeTemplate.content.firstElementChild.cloneNode(true);
 	const badge = node.querySelector('.badge');
+	const combo = edge.exampleCombo;
+	const selectedIds = new Set(selectedIngredients.map(ingredient => ingredient.id));
+	const selectedKeys = new Set(selectedIngredients.map(ingredient => ingredient.key));
 
-	node.querySelector('h2').textContent = recipe.name;
+	node.querySelector('.recipe-art').append(renderImage(recipe, 'recipe-image'));
+	node.querySelector('h2').textContent = displayName(recipe);
+	node.querySelector('.recipe-subtitle').textContent = recipe.name;
 	badge.textContent = recipe.characterRequired || 'DST';
 	badge.classList.toggle('is-warly', Boolean(recipe.characterRequired));
 	node.querySelector('.recipe-stats').append(renderStats(recipe));
-	node.querySelector('.combo-row').append(renderCombo(edge.exampleCombo));
+	node.querySelector('.combo-row').append(renderCombo(combo, selectedIds, selectedKeys));
 
 	return node;
 }
 
-function renderTags(tags) {
+function renderSharedTags(selectedIngredients) {
 	const fragment = document.createDocumentFragment();
-	const entries = Object.entries(tags);
+	if (selectedIngredients.length === 0) {
+		return fragment;
+	}
 
-	if (entries.length === 0) {
+	const sharedTags = Object.keys(selectedIngredients[0].tags).filter(tag =>
+		selectedIngredients.every(ingredient => ingredient.tags[tag]),
+	);
+
+	if (sharedTags.length === 0) {
 		const chip = document.createElement('span');
 		chip.className = 'tag-chip';
-		chip.textContent = 'filler';
+		chip.textContent = 'mixed';
 		fragment.append(chip);
 		return fragment;
 	}
 
-	for (const [tag, value] of entries) {
+	for (const tag of sharedTags) {
 		const chip = document.createElement('span');
 		chip.className = 'tag-chip';
-		chip.textContent = `${tag} ${value}`;
+		chip.textContent = tag;
 		fragment.append(chip);
 	}
 
 	return fragment;
+}
+
+function renderSelectedChips(selectedIngredients) {
+	const fragment = document.createDocumentFragment();
+	for (const ingredient of selectedIngredients) {
+		const chip = document.createElement('button');
+		chip.className = 'selected-chip';
+		chip.type = 'button';
+		chip.append(renderImage(ingredient, 'selected-chip-image'));
+		const label = document.createElement('span');
+		label.textContent = displayName(ingredient);
+		chip.append(label);
+		chip.addEventListener('click', () => {
+			toggleIngredient(ingredient.key);
+			renderAll();
+		});
+		fragment.append(chip);
+	}
+	return fragment;
+}
+
+function renderImage(item, className) {
+	const image = document.createElement('img');
+	image.className = className;
+	image.src = item.imageUrl;
+	image.alt = displayName(item);
+	image.loading = 'lazy';
+	image.addEventListener('error', () => {
+		image.replaceWith(renderImageFallback(item, className));
+	});
+	return image;
+}
+
+function renderImageFallback(item, className) {
+	const fallback = document.createElement('span');
+	fallback.className = `${className} image-fallback`;
+	fallback.textContent = displayName(item).slice(0, 1);
+	return fallback;
 }
 
 function renderStats(recipe) {
@@ -253,15 +386,26 @@ function renderStats(recipe) {
 	return fragment;
 }
 
-function renderCombo(combo) {
+function renderCombo(combo, selectedIds, selectedKeys) {
 	const fragment = document.createDocumentFragment();
 	for (const ingredient of combo) {
 		const chip = document.createElement('span');
 		chip.className = 'combo-chip';
-		chip.textContent = ingredient.name;
+		chip.classList.toggle(
+			'is-selected-source',
+			selectedIds.has(ingredient.id) || selectedKeys.has(ingredient.key),
+		);
+		chip.append(renderImage(ingredient, 'combo-chip-image'));
+		const label = document.createElement('span');
+		label.textContent = ingredient.zhName || ingredient.name;
+		chip.append(label);
 		fragment.append(chip);
 	}
 	return fragment;
+}
+
+function displayName(item) {
+	return item.zhName || item.name;
 }
 
 function formatNumber(value) {

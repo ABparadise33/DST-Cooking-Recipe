@@ -39,7 +39,7 @@
 						id="ingredient-search"
 						type="search"
 						autocomplete="off"
-						placeholder="搜尋 ingredient"
+						placeholder="搜尋食材 / ingredient"
 					>
 				</div>
 				<div class="control-row compact">
@@ -56,6 +56,7 @@
 						</select>
 					</label>
 				</div>
+				<button id="clear-selection" class="secondary-action" type="button">清除選取</button>
 				<div class="stat-line" id="dataset-status">載入資料中</div>
 				<div class="ingredient-list" id="ingredient-list" role="listbox" aria-label="食材清單"></div>
 			</section>
@@ -63,8 +64,9 @@
 			<section class="result-pane" aria-live="polite">
 				<div class="result-heading">
 					<div>
-						<p class="eyebrow">Selected Ingredient</p>
+						<p class="eyebrow">Selected Ingredients</p>
 						<h1 id="ingredient-name">-</h1>
+						<div class="selected-list" id="selected-ingredients"></div>
 						<div class="tag-list" id="ingredient-tags"></div>
 					</div>
 					<div class="result-count" id="result-count">0 recipes</div>
@@ -75,15 +77,23 @@
 
 		<template id="ingredient-template">
 			<button class="ingredient-option" type="button">
-				<span class="ingredient-option-name"></span>
+				<span class="ingredient-thumb"></span>
+				<span class="ingredient-option-text">
+					<span class="ingredient-option-name"></span>
+					<span class="ingredient-option-subtitle"></span>
+				</span>
 				<span class="ingredient-option-count"></span>
 			</button>
 		</template>
 
 		<template id="recipe-template">
 			<article class="recipe-card">
+				<div class="recipe-art"></div>
 				<div class="recipe-card-header">
-					<h2></h2>
+					<div class="recipe-title">
+						<h2></h2>
+						<p class="recipe-subtitle"></p>
+					</div>
 					<span class="badge"></span>
 				</div>
 				<div class="recipe-stats"></div>

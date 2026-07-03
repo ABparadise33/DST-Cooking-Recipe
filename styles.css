@@ -184,6 +184,24 @@ select {
 	gap: 8px;
 }
 
+.secondary-action {
+	min-height: 40px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--surface);
+	color: var(--moss-dark);
+	font: inherit;
+	font-size: 14px;
+	font-weight: 850;
+	cursor: pointer;
+}
+
+.secondary-action:disabled {
+	color: var(--muted);
+	cursor: default;
+	opacity: 0.6;
+}
+
 .stat-line {
 	min-height: 24px;
 	color: var(--muted);
@@ -200,11 +218,11 @@ select {
 
 .ingredient-option {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-columns: 38px minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 12px;
-	min-height: 44px;
-	padding: 0 12px;
+	min-height: 58px;
+	padding: 8px 12px;
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: rgba(255, 255, 255, 0.72);
@@ -228,12 +246,63 @@ select {
 	box-shadow: var(--shadow);
 }
 
-.ingredient-option-name {
+.ingredient-thumb,
+.recipe-art,
+.selected-chip-image,
+.combo-chip-image {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	overflow: hidden;
-	font-size: 15px;
-	font-weight: 800;
+	background: #f0f2eb;
+}
+
+.ingredient-thumb {
+	width: 38px;
+	height: 38px;
+	border-radius: 8px;
+}
+
+.ingredient-thumb-image,
+.selected-chip-image,
+.combo-chip-image,
+.recipe-image {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.image-fallback {
+	color: var(--moss-dark);
+	font-weight: 900;
+}
+
+.ingredient-option-text {
+	display: grid;
+	min-width: 0;
+	gap: 3px;
+}
+
+.ingredient-option-name,
+.ingredient-option-subtitle {
+	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.ingredient-option-name {
+	font-size: 15px;
+	font-weight: 850;
+}
+
+.ingredient-option-subtitle {
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 750;
+}
+
+.ingredient-option.is-active .ingredient-option-subtitle {
+	color: rgba(255, 255, 255, 0.76);
 }
 
 .ingredient-option-count {
@@ -296,6 +365,7 @@ h1 {
 }
 
 .tag-list,
+.selected-list,
 .combo-row,
 .recipe-stats {
 	display: flex;
@@ -303,8 +373,13 @@ h1 {
 	gap: 8px;
 }
 
+.selected-list {
+	margin: 10px 0 8px;
+}
+
 .tag-chip,
 .combo-chip,
+.selected-chip,
 .stat-chip,
 .badge {
 	display: inline-flex;
@@ -315,6 +390,22 @@ h1 {
 	font-weight: 850;
 	line-height: 1;
 	white-space: nowrap;
+}
+
+.selected-chip {
+	gap: 6px;
+	padding: 0 10px 0 4px;
+	border: 1px solid rgba(49, 92, 69, 0.28);
+	background: rgba(49, 92, 69, 0.1);
+	color: var(--moss-dark);
+	font: inherit;
+	cursor: pointer;
+}
+
+.selected-chip-image {
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
 }
 
 .tag-chip {
@@ -332,12 +423,26 @@ h1 {
 .recipe-card {
 	display: grid;
 	gap: 14px;
-	min-height: 190px;
+	grid-template-rows: 104px auto auto 1fr;
+	min-height: 310px;
 	padding: 16px;
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: var(--surface);
 	box-shadow: 0 1px 0 rgba(36, 33, 28, 0.04);
+}
+
+.recipe-art {
+	width: 100%;
+	height: 104px;
+	border-radius: 8px;
+	background:
+		linear-gradient(135deg, rgba(200, 157, 60, 0.16), rgba(49, 92, 69, 0.1)),
+		#f8f8f4;
+}
+
+.recipe-image {
+	padding: 10px;
 }
 
 .recipe-card-header {
@@ -347,9 +452,23 @@ h1 {
 	gap: 12px;
 }
 
+.recipe-title {
+	display: grid;
+	min-width: 0;
+	gap: 4px;
+}
+
 .recipe-card h2 {
 	font-size: 18px;
 	line-height: 1.25;
+}
+
+.recipe-subtitle {
+	margin: 0;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 750;
+	line-height: 1.2;
 }
 
 .badge {
@@ -379,9 +498,22 @@ h1 {
 }
 
 .combo-chip {
-	padding: 0 9px;
+	gap: 6px;
+	min-height: 32px;
+	padding: 0 10px 0 4px;
 	background: rgba(200, 157, 60, 0.16);
 	color: #6e4d0f;
+}
+
+.combo-chip.is-selected-source {
+	background: rgba(49, 92, 69, 0.15);
+	color: var(--moss-dark);
+}
+
+.combo-chip-image {
+	width: 24px;
+	height: 24px;
+	border-radius: 999px;
 }
 
 .empty-state {
