@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-Hant">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>DST Crock Pot Lookup</title>
+		<meta
+			name="description"
+			content="Don't Starve Together Crock Pot ingredient reverse lookup."
+		>
+		<link rel="icon" href="favicon.svg" type="image/svg+xml">
+		<link rel="stylesheet" href="styles.css">
+		<script src="app.js" defer></script>
+	</head>
+	<body>
+		<header class="site-header">
+			<a class="brand" href="./" aria-label="DST Crock Pot Lookup">
+				<svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+					<path d="M18 24h28l-3 25H21z" class="pot-body"></path>
+					<path d="M15 23c4-5 30-5 34 0" class="pot-rim"></path>
+					<path d="M21 20c0-5 6-8 11-8s11 3 11 8" class="pot-handle"></path>
+					<circle cx="25" cy="33" r="3" class="ingredient-one"></circle>
+					<circle cx="36" cy="32" r="4" class="ingredient-two"></circle>
+					<circle cx="31" cy="41" r="3" class="ingredient-three"></circle>
+				</svg>
+				<span>DST Crock Pot Lookup</span>
+			</a>
+			<nav class="header-actions" aria-label="資料下載">
+				<a href="data/dst_crockpot_ingredient_lookup.csv">食材 CSV</a>
+				<a href="data/dst_crockpot_ingredient_recipe_edges.csv">關係 CSV</a>
+			</nav>
+		</header>
+
+		<main class="app-shell">
+			<section class="search-pane" aria-label="食材搜尋">
+				<div class="control-row">
+					<label class="field-label" for="ingredient-search">食材</label>
+					<input
+						id="ingredient-search"
+						type="search"
+						autocomplete="off"
+						placeholder="搜尋 ingredient"
+					>
+				</div>
+				<div class="control-row compact">
+					<label class="switch">
+						<input id="include-warly" type="checkbox" checked>
+						<span>包含 Warly</span>
+					</label>
+					<label class="sort-control" for="recipe-sort">
+						<span>排序</span>
+						<select id="recipe-sort">
+							<option value="name">名稱</option>
+							<option value="priority">Priority</option>
+							<option value="hunger">Hunger</option>
+						</select>
+					</label>
+				</div>
+				<div class="stat-line" id="dataset-status">載入資料中</div>
+				<div class="ingredient-list" id="ingredient-list" role="listbox" aria-label="食材清單"></div>
+			</section>
+
+			<section class="result-pane" aria-live="polite">
+				<div class="result-heading">
+					<div>
+						<p class="eyebrow">Selected Ingredient</p>
+						<h1 id="ingredient-name">-</h1>
+						<div class="tag-list" id="ingredient-tags"></div>
+					</div>
+					<div class="result-count" id="result-count">0 recipes</div>
+				</div>
+				<div class="recipe-grid" id="recipe-grid"></div>
+			</section>
+		</main>
+
+		<template id="ingredient-template">
+			<button class="ingredient-option" type="button">
+				<span class="ingredient-option-name"></span>
+				<span class="ingredient-option-count"></span>
+			</button>
+		</template>
+
+		<template id="recipe-template">
+			<article class="recipe-card">
+				<div class="recipe-card-header">
+					<h2></h2>
+					<span class="badge"></span>
+				</div>
+				<div class="recipe-stats"></div>
+				<div class="combo-row"></div>
+			</article>
+		</template>
+	</body>
+</html>
