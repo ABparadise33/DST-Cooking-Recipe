@@ -4,13 +4,89 @@ const state = {
 	data: null,
 	selectedKeys: [],
 	search: '',
+	category: 'all',
 	includeWarly: true,
 	sort: 'name',
+};
+
+const INGREDIENT_CATEGORIES = [
+	{ id: 'all', label: '全部' },
+	{ id: 'meat', label: '肉類', tag: 'meat' },
+	{ id: 'fish', label: '魚類', tag: 'fish' },
+	{ id: 'veggie', label: '蔬菜', tag: 'veggie' },
+	{ id: 'fruit', label: '水果', tag: 'fruit' },
+	{ id: 'egg', label: '蛋', tag: 'egg' },
+	{ id: 'sweetener', label: '甜味', tag: 'sweetener' },
+	{ id: 'monster', label: '怪物', tag: 'monster' },
+	{ id: 'inedible', label: '不可食', tag: 'inedible' },
+	{ id: 'filler', label: '填充/其他' },
+];
+
+const FILLER_EXCLUDED_TAGS = new Set([
+	'egg',
+	'fish',
+	'fruit',
+	'inedible',
+	'meat',
+	'monster',
+	'sweetener',
+	'veggie',
+]);
+
+const STAT_META = {
+	priority: { label: 'priority' },
+	hunger: { icon: 'hunger', label: '飽食' },
+	health: { icon: 'health', label: '生命' },
+	sanity: { icon: 'sanity', label: '理智' },
+	cook: { label: 'cook' },
+};
+
+const STAT_ICON_PATHS = {
+	hunger: [
+		'M5 3v7',
+		'M8 3v7',
+		'M3 3v5a3.5 3.5 0 0 0 7 0V3',
+		'M6.5 10v11',
+		'M17 3v18',
+		'M17 3c2.6 1.8 4 4.7 4 8h-4',
+	],
+	health: [
+		'M12 21s-7.2-4.4-9.2-8.7C1.2 8.8 3.2 5 6.8 5c2 0 3.3 1.1 5.2 3.2C13.9 6.1 15.2 5 17.2 5c3.6 0 5.6 3.8 4 7.3C19.2 16.6 12 21 12 21z',
+	],
+	sanity: [
+		'M20 12a8 8 0 1 1-8-8',
+		'M16 12a4 4 0 1 1-4-4',
+		'M12 12h.01',
+	],
+};
+
+const NAME_VARIANTS = {
+	berries: ['berries', 'berries_cooked', 'berries_juicy', 'berries_juicy_cooked'],
+	cactus_flower: ['cactusflower'],
+	cactus_meat: ['cactusmeat', 'cactusmeat_cooked'],
+	eel: ['eel', 'eel_cooked'],
+	kelp: ['kelp', 'kelp_cooked'],
+	lobster: ['wobster'],
+	smallmeat: ['morsel', 'morsel_cooked', 'morsel_dried'],
+	wobster_sheller_land: ['wobster'],
+};
+
+const RECIPE_NAME_VARIANTS = {
+	batnosehat: {
+		batnose: ['batnose'],
+	},
+	californiaroll_dst: {
+		kelp: ['kelp', 'kelp_cooked', 'kelp_dried'],
+	},
+	unagi_dst: {
+		kelp: ['kelp', 'kelp_cooked', 'kelp_dried'],
+	},
 };
 
 const els = {
 	status: document.querySelector('#dataset-status'),
 	search: document.querySelector('#ingredient-search'),
+	categories: document.querySelector('#ingredient-categories'),
 	includeWarly: document.querySelector('#include-warly'),
 	sort: document.querySelector('#recipe-sort'),
 	clearSelection: document.querySelector('#clear-selection'),
@@ -80,12 +156,17 @@ function prepareData(data) {
 		displayName(a).localeCompare(displayName(b), 'zh-Hant'),
 	);
 	const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.key, ingredient]));
+	const recipeList = Object.values(data.recipes).sort(compareRecipesForCooking);
 
 	return {
 		...data,
 		ingredients,
 		ingredientMap,
 		edgeMap,
+		standardRecipeList: recipeList.filter(recipe => recipe.mode === 'together'),
+		warlyRecipeList: recipeList.filter(recipe =>
+			recipe.mode === 'together' || recipe.mode === 'warlydst',
+		),
 	};
 }
 
@@ -99,8 +180,38 @@ function render() {
 }
 
 function renderAll() {
+	renderIngredientCategories();
 	renderIngredientList();
 	renderSelectionResults();
+}
+
+function renderIngredientCategories() {
+	if (!state.data) {
+		return;
+	}
+
+	const fragment = document.createDocumentFragment();
+	els.categories.innerHTML = '';
+
+	for (const category of INGREDIENT_CATEGORIES) {
+		const button = document.createElement('button');
+		const active = state.category === category.id;
+		button.className = 'category-tab';
+		button.type = 'button';
+		button.dataset.category = category.id;
+		button.setAttribute('role', 'tab');
+		button.setAttribute('aria-selected', String(active));
+		button.classList.toggle('is-active', active);
+		button.textContent = `${category.label} ${categoryIngredientCount(category)}`;
+		button.addEventListener('click', () => {
+			state.category = category.id;
+			renderIngredientCategories();
+			renderIngredientList();
+		});
+		fragment.append(button);
+	}
+
+	els.categories.append(fragment);
 }
 
 function renderIngredientList() {
@@ -109,7 +220,7 @@ function renderIngredientList() {
 	}
 
 	const fragment = document.createDocumentFragment();
-	const ingredients = state.data.ingredients.filter(matchesIngredientSearch);
+	const ingredients = state.data.ingredients.filter(matchesIngredientFilters);
 	const previousScrollTop = els.ingredientList.scrollTop;
 	els.ingredientList.innerHTML = '';
 
@@ -134,13 +245,38 @@ function renderIngredientList() {
 	els.ingredientList.scrollTop = previousScrollTop;
 }
 
+function categoryIngredientCount(category) {
+	return state.data.ingredients.filter(ingredient => matchesIngredientCategory(ingredient, category)).length;
+}
+
+function matchesIngredientFilters(ingredient) {
+	return matchesIngredientCategory(ingredient, activeCategory()) && matchesIngredientSearch(ingredient);
+}
+
+function activeCategory() {
+	return INGREDIENT_CATEGORIES.find(category => category.id === state.category) ?? INGREDIENT_CATEGORIES[0];
+}
+
+function matchesIngredientCategory(ingredient, category) {
+	if (!category || category.id === 'all') {
+		return true;
+	}
+
+	const tags = ingredient.tags || {};
+	if (category.id === 'filler') {
+		return !Object.keys(tags).some(tag => FILLER_EXCLUDED_TAGS.has(tag));
+	}
+
+	return Boolean(tags[category.tag]);
+}
+
 function renderSelectionResults() {
 	if (!state.data) {
 		return;
 	}
 
 	const selectedIngredients = selectedIngredientObjects();
-	const resultEdges = sortedEdges(intersectionEdges(selectedIngredients), selectedIngredients);
+	const resultEdges = sortedEdges(possibleEdges(selectedIngredients), selectedIngredients);
 	els.ingredientName.textContent = selectedIngredients.length
 		? `${selectedIngredients.length} 個食材`
 		: '尚未選擇';
@@ -215,6 +351,14 @@ function visibleEdgesForIngredient(ingredient) {
 	return edges.filter(edge => !state.data.recipes[edge.recipeId]?.characterRequired);
 }
 
+function possibleEdges(selectedIngredients) {
+	if (selectedIngredients.length <= 1) {
+		return intersectionEdges(selectedIngredients);
+	}
+
+	return exactComboEdges(selectedIngredients);
+}
+
 function intersectionEdges(selectedIngredients) {
 	if (selectedIngredients.length === 0) {
 		return [];
@@ -257,6 +401,181 @@ function bestExampleEdge(edges, selectedIngredients) {
 	}
 
 	return best;
+}
+
+function exactComboEdges(selectedIngredients) {
+	const openSlots = 4 - selectedIngredients.length;
+	if (openSlots < 0) {
+		return [];
+	}
+
+	const results = new Map();
+	enumerateFillerCombos(openSlots, fillers => {
+		const combo = [...selectedIngredients, ...fillers];
+		const totals = totalsForCombo(combo);
+		const standardWinners = winningRecipesForCombo(state.data.standardRecipeList, totals);
+		const warlyWinners = state.includeWarly
+			? winningRecipesForCombo(state.data.warlyRecipeList, totals).filter(
+				recipe => recipe.mode === 'warlydst',
+			)
+			: [];
+
+		for (const recipe of [...standardWinners, ...warlyWinners]) {
+			if (recipe.id === 'wetgoop_dst' || results.has(recipe.id)) {
+				continue;
+			}
+
+			results.set(recipe.id, {
+				recipeId: recipe.id,
+				resultScope: recipe.mode === 'warlydst' ? 'warly' : 'standard',
+				exampleCombo: combo.map(ingredient => ({
+					key: ingredient.key,
+					id: ingredient.id,
+					name: ingredient.name,
+					zhName: ingredient.zhName,
+					imageUrl: ingredient.imageUrl,
+				})),
+			});
+		}
+	});
+
+	return [...results.values()];
+}
+
+function enumerateFillerCombos(openSlots, callback) {
+	const fillers = [];
+
+	function walk(startIndex, depth) {
+		if (depth === openSlots) {
+			callback(fillers);
+			return;
+		}
+
+		for (let index = startIndex; index < state.data.ingredients.length; index++) {
+			fillers.push(state.data.ingredients[index]);
+			walk(index, depth + 1);
+			fillers.pop();
+		}
+	}
+
+	walk(0, 0);
+}
+
+function totalsForCombo(combo) {
+	const names = {};
+	const tags = {};
+
+	for (const ingredient of combo) {
+		names[ingredient.id] = (names[ingredient.id] || 0) + 1;
+
+		for (const [tag, value] of Object.entries(ingredient.tags || {})) {
+			tags[tag] = (tags[tag] || 0) + value;
+		}
+	}
+
+	return { names, tags };
+}
+
+function winningRecipesForCombo(recipeList, totals) {
+	const winners = [];
+	let winningPriority = null;
+
+	for (const recipe of recipeList) {
+		if (winningPriority !== null && recipe.priority < winningPriority) {
+			break;
+		}
+
+		if (recipeMatches(recipe, totals)) {
+			winningPriority = recipe.priority;
+			winners.push(recipe);
+		}
+	}
+
+	return winners;
+}
+
+function recipeMatches(recipe, totals) {
+	const rules = recipe.requirementRules || [];
+	return rules.length > 0 && rules.every(rule => evaluateRule(rule, totals, recipe));
+}
+
+function evaluateRule(rule, totals, recipe) {
+	if (!rule) {
+		return false;
+	}
+
+	if (rule.type === 'NOTTest') {
+		return !evaluateRule(rule.item, totals, recipe);
+	}
+
+	if (rule.type === 'ORTest') {
+		return evaluateRule(rule.item1, totals, recipe) || evaluateRule(rule.item2, totals, recipe);
+	}
+
+	if (rule.type === 'ANDTest') {
+		return evaluateRule(rule.item1, totals, recipe) && evaluateRule(rule.item2, totals, recipe);
+	}
+
+	if (rule.type === 'TAGTest') {
+		return compareQty(totals.tags[rule.tag] || 0, rule.qty);
+	}
+
+	if (rule.type === 'NAMETest') {
+		return compareQty(nameValue(rule.name, totals, recipe), rule.qty);
+	}
+
+	if (rule.type === 'SPECIFICTest') {
+		return compareQty(totals.names[rule.name] || 0, rule.qty);
+	}
+
+	return false;
+}
+
+function nameValue(name, totals, recipe) {
+	const variants = RECIPE_NAME_VARIANTS[recipe.id]?.[name] || NAME_VARIANTS[name] || [name, `${name}_cooked`];
+	const uniqueVariants = [...new Set(variants)];
+	return uniqueVariants.reduce((sum, variant) => sum + (totals.names[variant] || 0), 0);
+}
+
+function compareQty(value, qty) {
+	if (!qty) {
+		return value > 0;
+	}
+
+	if (value <= 0) {
+		return false;
+	}
+
+	if (qty.op === '=') {
+		return value === qty.value;
+	}
+
+	if (qty.op === '>') {
+		return value > qty.value;
+	}
+
+	if (qty.op === '<') {
+		return value < qty.value;
+	}
+
+	if (qty.op === '>=') {
+		return value >= qty.value;
+	}
+
+	if (qty.op === '<=') {
+		return value <= qty.value;
+	}
+
+	return false;
+}
+
+function compareRecipesForCooking(a, b) {
+	return (
+		b.priority - a.priority ||
+		Number(b.weight || 1) - Number(a.weight || 1) ||
+		a.name.localeCompare(b.name) ||
+		a.id.localeCompare(b.id)
+	);
 }
 
 function sortedEdges(edges, selectedIngredients) {
@@ -315,10 +634,29 @@ function renderRecipeCard(edge, selectedIngredients) {
 		? `指定：${directMatches.map(displayName).join('、')}`
 		: '係數 / 填充';
 	matchRow.classList.toggle('is-direct', directMatches.length > 0);
+	node.querySelector('.method-row').append(renderMethod(recipe));
 	node.querySelector('.recipe-stats').append(renderStats(recipe));
 	node.querySelector('.combo-row').append(renderCombo(combo, selectedIds, selectedKeys));
 
 	return node;
+}
+
+function renderMethod(recipe) {
+	const fragment = document.createDocumentFragment();
+	const label = document.createElement('span');
+	const lines = recipe.requirementLines?.length ? recipe.requirementLines : ['任意食材'];
+	label.className = 'method-label';
+	label.textContent = '做法';
+	fragment.append(label);
+
+	for (const line of lines) {
+		const chip = document.createElement('span');
+		chip.className = 'method-chip';
+		chip.textContent = line;
+		fragment.append(chip);
+	}
+
+	return fragment;
 }
 
 function renderSharedTags(selectedIngredients) {
@@ -397,18 +735,45 @@ function renderStats(recipe) {
 		['cook', recipe.cooktime],
 	];
 
-	for (const [label, value] of stats) {
+	for (const [id, value] of stats) {
 		if (value === '' || value === null || value === undefined) {
 			continue;
 		}
 
+		const meta = STAT_META[id];
 		const chip = document.createElement('span');
 		chip.className = 'stat-chip';
-		chip.textContent = `${label} ${formatNumber(value)}`;
+		if (meta?.icon) {
+			chip.classList.add('has-icon', `is-${id}`);
+			chip.title = `${meta.label} ${formatNumber(value)}`;
+			chip.setAttribute('aria-label', `${meta.label} ${formatNumber(value)}`);
+			chip.append(renderStatIcon(meta.icon));
+			const valueNode = document.createElement('span');
+			valueNode.textContent = formatNumber(value);
+			chip.append(valueNode);
+		} else {
+			chip.textContent = `${meta?.label || id} ${formatNumber(value)}`;
+		}
 		fragment.append(chip);
 	}
 
 	return fragment;
+}
+
+function renderStatIcon(icon) {
+	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+	svg.setAttribute('class', 'stat-icon');
+	svg.setAttribute('viewBox', '0 0 24 24');
+	svg.setAttribute('aria-hidden', 'true');
+	svg.setAttribute('focusable', 'false');
+
+	for (const d of STAT_ICON_PATHS[icon] || []) {
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', d);
+		svg.append(path);
+	}
+
+	return svg;
 }
 
 function renderCombo(combo, selectedIds, selectedKeys) {

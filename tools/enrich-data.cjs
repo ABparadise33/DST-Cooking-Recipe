@@ -8,6 +8,22 @@ const SUMMARY_CSV = path.join(ROOT, 'data/dst_crockpot_ingredient_lookup.csv');
 const EDGES_CSV = path.join(ROOT, 'data/dst_crockpot_ingredient_recipe_edges.csv');
 const IMAGE_BASE_URL = 'https://bluehexagons.github.io/foodguide/img/';
 
+const tagZh = {
+	dairy: '乳製係數',
+	egg: '蛋類係數',
+	fat: '油脂係數',
+	fish: '魚類係數',
+	frozen: '冰凍係數',
+	fruit: '水果係數',
+	inedible: '不可食用',
+	magic: '魔法係數',
+	meat: '肉類係數',
+	monster: '怪物係數',
+	seed: '種子係數',
+	sweetener: '甜味係數',
+	veggie: '蔬菜係數',
+};
+
 const ingredientZh = {
 	acorn: '樺栗果',
 	acorn_cooked: '烤樺栗果',
@@ -240,8 +256,12 @@ async function main() {
 	}
 
 	for (const recipe of Object.values(data.recipes)) {
+		const sourceRecipe = sourceRecipes[recipe.id];
 		recipe.zhName = recipeZh[recipe.id] || recipe.name;
 		recipe.imageUrl = imageUrl(recipe.name);
+		recipe.requirementLines = buildRequirementLines(sourceRecipe, data.ingredients);
+		recipe.requirementText = recipe.requirementLines.join('、');
+		recipe.requirementRules = (sourceRecipe?.requirements || []).map(serializeRequirement);
 	}
 
 	addDirectRequirements(data, sourceRecipes);
@@ -274,6 +294,8 @@ async function main() {
 		'Manual Traditional Chinese draft names; English names are preserved as fallback.';
 	data.metadata.direct_requirement_source =
 		'Recipe requirement declarations from the Food Guide data modules.';
+	data.metadata.requirement_text_source =
+		'Chinese summary generated from the Food Guide recipe requirement declarations.';
 
 	fs.writeFileSync(DATA_FILE, `${JSON.stringify(data)}\n`);
 	writeCsv(SUMMARY_CSV, summaryColumns(), summaryRows(data));
@@ -356,6 +378,203 @@ function expandDirectNames(directNames, knownIngredientIds) {
 	return result;
 }
 
+function buildRequirementLines(sourceRecipe, ingredients) {
+	const ingredientById = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
+	return (sourceRecipe?.requirements || [])
+		.map(requirement => formatRequirement(requirement, ingredientById))
+		.filter(Boolean);
+}
+
+function serializeRequirement(requirement) {
+	if (!requirement || typeof requirement !== 'object') {
+		return null;
+	}
+
+	const result = {
+		type: requirement.test?.name || 'unknown',
+	};
+
+	if (requirement.cancel) {
+		result.cancel = true;
+	}
+
+	if (requirement.name) {
+		result.name = requirement.name;
+	}
+
+	if (requirement.tag) {
+		result.tag = requirement.tag;
+	}
+
+	if (requirement.qty?.op) {
+		result.qty = {
+			op: requirement.qty.op,
+			value: requirement.qty.qty,
+		};
+	}
+
+	if (requirement.item) {
+		result.item = serializeRequirement(requirement.item);
+	}
+
+	if (requirement.item1) {
+		result.item1 = serializeRequirement(requirement.item1);
+	}
+
+	if (requirement.item2) {
+		result.item2 = serializeRequirement(requirement.item2);
+	}
+
+	return result;
+}
+
+function formatRequirement(requirement, ingredientById) {
+	if (!requirement || typeof requirement !== 'object') {
+		return '';
+	}
+
+	if (requirement.test?.name === 'NOTTest' && requirement.item) {
+		return `不可放 ${formatRequirementTarget(requirement.item, ingredientById)}`;
+	}
+
+	if (requirement.test?.name === 'ORTest' && requirement.item1 && requirement.item2) {
+		const simplified = simplifyOrRequirement(requirement, ingredientById);
+		if (simplified) {
+			return simplified;
+		}
+
+		return [requirement.item1, requirement.item2]
+			.map(item => formatRequirement(item, ingredientById))
+			.filter(Boolean)
+			.join(' 或 ');
+	}
+
+	if (requirement.test?.name === 'ANDTest' && requirement.item1 && requirement.item2) {
+		return [requirement.item1, requirement.item2]
+			.map(item => formatRequirement(item, ingredientById))
+			.filter(Boolean)
+			.join(' 且 ');
+	}
+
+	return formatPositiveRequirement(requirement, ingredientById);
+}
+
+function simplifyOrRequirement(requirement, ingredientById) {
+	const items = [requirement.item1, requirement.item2];
+	const positiveLimit = items.find(item => !item.cancel && hasCompareQty(item));
+	const negative = items.find(item => item.test?.name === 'NOTTest' && item.item);
+
+	if (
+		positiveLimit &&
+		negative &&
+		requirementIdentity(positiveLimit) === requirementIdentity(negative.item)
+	) {
+		return formatPositiveRequirement(positiveLimit, ingredientById);
+	}
+
+	return '';
+}
+
+function requirementIdentity(requirement) {
+	if (requirement?.tag) {
+		return `tag:${requirement.tag}`;
+	}
+
+	if (requirement?.name) {
+		return `name:${requirement.name}`;
+	}
+
+	return '';
+}
+
+function hasCompareQty(requirement) {
+	return Boolean(requirement?.qty?.op);
+}
+
+function formatPositiveRequirement(requirement, ingredientById) {
+	if (requirement.tag) {
+		return `${tagLabel(requirement.tag)} ${formatQty(requirement.qty, 'tag')}`;
+	}
+
+	if (requirement.name) {
+		return `${ingredientLabel(requirement.name, ingredientById)} ${formatQty(requirement.qty, 'name')}`;
+	}
+
+	return formatRequirementTarget(requirement, ingredientById);
+}
+
+function formatRequirementTarget(requirement, ingredientById) {
+	if (!requirement || typeof requirement !== 'object') {
+		return '';
+	}
+
+	if (requirement.tag) {
+		return tagLabel(requirement.tag);
+	}
+
+	if (requirement.name) {
+		return ingredientLabel(requirement.name, ingredientById);
+	}
+
+	if (requirement.item) {
+		return formatRequirementTarget(requirement.item, ingredientById);
+	}
+
+	if (requirement.item1 && requirement.item2) {
+		const joiner = requirement.test?.name === 'ANDTest' ? ' 且 ' : ' 或 ';
+		return [requirement.item1, requirement.item2]
+			.map(item => formatRequirementTarget(item, ingredientById))
+			.filter(Boolean)
+			.join(joiner);
+	}
+
+	return '';
+}
+
+function formatQty(qty, type) {
+	if (qty?.op) {
+		if (type === 'tag' && ['<', '<='].includes(qty.op)) {
+			return `> 0 且 ${qty.op} ${formatNumber(qty.qty)}`;
+		}
+
+		return `${qty.op} ${formatNumber(qty.qty)}`;
+	}
+
+	return type === 'tag' ? '> 0' : '>= 1';
+}
+
+function formatNumber(value) {
+	if (Number.isInteger(value)) {
+		return String(value);
+	}
+
+	return String(Number(value.toFixed(2)));
+}
+
+function tagLabel(tag) {
+	return tagZh[tag] || `${tag} 係數`;
+}
+
+function ingredientLabel(name, ingredientById) {
+	const aliases = {
+		cactus_flower: 'cactusflower',
+		cactus_meat: 'cactusmeat',
+		lobster: 'wobster',
+		smallmeat: 'morsel',
+		wobster_sheller_land: 'wobster',
+	};
+	const id = aliases[name] || name;
+	const ingredient = ingredientById.get(id);
+	return ingredient?.zhName || ingredientZh[id] || prettifyId(name);
+}
+
+function prettifyId(id) {
+	return id
+		.replace(/_cooked$/, '')
+		.replace(/_/g, ' ')
+		.replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
 function imageUrl(name) {
 	return `${IMAGE_BASE_URL}${encodeURI(imageFile(name))}`;
 }
@@ -425,6 +644,7 @@ function edgeColumns() {
 		'hunger',
 		'sanity',
 		'cooktime',
+		'recipe_requirement_text',
 		'example_combo_keys',
 		'example_combo_names',
 		'example_combo_zh_names',
@@ -455,6 +675,7 @@ function edgeRows({ edges, recipes, ingredients }) {
 			hunger: recipe?.hunger ?? '',
 			sanity: recipe?.sanity ?? '',
 			cooktime: recipe?.cooktime ?? '',
+			recipe_requirement_text: recipe?.requirementText || '',
 			example_combo_keys: edge.exampleCombo.map(item => item.key).join(' + '),
 			example_combo_names: edge.exampleCombo.map(item => item.name).join(' + '),
 			example_combo_zh_names: edge.exampleCombo.map(item => item.zhName).join(' + '),
