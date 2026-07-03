@@ -1,4 +1,5 @@
-const DATA_URL = 'data/lookup.json';
+const DATA_VERSION = '20260704b';
+const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
 	data: null,
@@ -129,7 +130,7 @@ async function init() {
 		render();
 	} catch (error) {
 		els.status.textContent = '資料載入失敗';
-		els.recipeGrid.innerHTML = `<div class="empty-state">Cannot load ${DATA_URL}: ${escapeHtml(error.message)}</div>`;
+		els.recipeGrid.innerHTML = `<div class="empty-state">資料載入或畫面渲染失敗：${escapeHtml(error.message)}</div>`;
 	}
 }
 
@@ -646,11 +647,18 @@ function renderRecipeCard(edge, selectedIngredients) {
 		? `指定：${directMatches.map(displayName).join('、')}`
 		: '係數 / 填充';
 	matchRow.classList.toggle('is-direct', directMatches.length > 0);
-	node.querySelector('.recipe-stats').append(renderStats(recipe));
-	node.querySelector('.recipe-meta').append(renderRecipeMeta(recipe));
-	node.querySelector('.recipe-requirements').append(renderRequirementBoard(recipe));
+	appendTo(node, '.recipe-stats', renderStats(recipe));
+	appendTo(node, '.recipe-meta', renderRecipeMeta(recipe));
+	appendTo(node, '.recipe-requirements', renderRequirementBoard(recipe));
 
 	return node;
+}
+
+function appendTo(root, selector, child) {
+	const target = root.querySelector(selector);
+	if (target) {
+		target.append(child);
+	}
 }
 
 function renderRecipeMeta(recipe) {

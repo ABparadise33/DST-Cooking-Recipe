@@ -1,4 +1,4 @@
-# DST Crock Pot Lookup
+# DST Cooking Recipe
 
 A static GitHub Pages site for reverse-looking-up Don't Starve Together Crock Pot recipes by ingredient.
 
@@ -42,7 +42,7 @@ After pushing to GitHub, enable Pages:
 The site will be available at:
 
 ```text
-https://ABparadise33.github.io/DST-Cookie-Recipe/
+https://ABparadise33.github.io/DST-Cooking-Recipe/
 ```
 
 ## Data

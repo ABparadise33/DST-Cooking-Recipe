@@ -46,8 +46,7 @@ a {
 	backdrop-filter: blur(12px);
 }
 
-.brand,
-.header-actions {
+.brand {
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -88,21 +87,6 @@ a {
 
 .ingredient-three {
 	fill: var(--moss);
-}
-
-.header-actions a {
-	display: inline-flex;
-	align-items: center;
-	min-height: 34px;
-	padding: 0 12px;
-	border: 1px solid var(--line);
-	border-radius: 8px;
-	background: var(--surface);
-	color: var(--moss-dark);
-	font-size: 14px;
-	font-weight: 700;
-	text-decoration: none;
-	white-space: nowrap;
 }
 
 .app-shell {
@@ -660,13 +644,6 @@ h1 {
 @media (max-width: 840px) {
 	.site-header {
 		position: static;
-		align-items: flex-start;
-		flex-direction: column;
-	}
-
-	.header-actions {
-		width: 100%;
-		overflow-x: auto;
 	}
 
 	.app-shell {
