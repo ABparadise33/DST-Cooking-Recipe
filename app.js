@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704c';
+const DATA_VERSION = '20260704d';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
