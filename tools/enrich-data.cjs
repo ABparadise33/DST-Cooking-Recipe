@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
 const DATA_FILE = path.join(ROOT, 'data/lookup.json');
@@ -223,60 +224,137 @@ const recipeZh = {
 	lobsterdinner_dst: '龍蝦晚餐',
 };
 
-const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+main().catch(error => {
+	console.error(error);
+	process.exit(1);
+});
 
-for (const ingredient of data.ingredients) {
-	ingredient.zhName = ingredientZh[ingredient.id] || ingredient.name;
-	ingredient.imageUrl = imageUrl(ingredient.name);
+async function main() {
+	const sourceModuleUrl = pathToFileURL(path.join(ROOT, '../work/source/recipes.js')).href;
+	const { recipes: sourceRecipes } = await import(sourceModuleUrl);
+	const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+
+	for (const ingredient of data.ingredients) {
+		ingredient.zhName = ingredientZh[ingredient.id] || ingredient.name;
+		ingredient.imageUrl = imageUrl(ingredient.name);
+	}
+
+	for (const recipe of Object.values(data.recipes)) {
+		recipe.zhName = recipeZh[recipe.id] || recipe.name;
+		recipe.imageUrl = imageUrl(recipe.name);
+	}
+
+	addDirectRequirements(data, sourceRecipes);
+
+	const ingredientByKey = new Map(data.ingredients.map(ingredient => [ingredient.key, ingredient]));
+	const ingredientById = new Map(data.ingredients.map(ingredient => [ingredient.id, ingredient]));
+
+	for (const edge of data.edges) {
+		const ingredient = ingredientByKey.get(edge.ingredientKey);
+		const recipe = data.recipes[edge.recipeId];
+		edge.ingredientName = ingredient?.name || edge.ingredientKey;
+		edge.ingredientZhName = ingredient?.zhName || edge.ingredientName;
+		edge.recipeName = recipe?.name || edge.recipeId;
+		edge.recipeZhName = recipe?.zhName || edge.recipeName;
+		edge.exampleCombo = edge.exampleCombo.map(item => {
+			const fullIngredient = ingredientByKey.get(item.key) || ingredientById.get(item.id);
+			return {
+				...item,
+				zhName: fullIngredient?.zhName || ingredientZh[item.id] || item.name,
+				imageUrl: fullIngredient?.imageUrl || imageUrl(item.name),
+			};
+		});
+	}
+
+	data.metadata.image_source = {
+		name: 'Bluehexagons Food Guide images',
+		url: 'https://bluehexagons.github.io/foodguide/img/',
+	};
+	data.metadata.zh_name_source =
+		'Manual Traditional Chinese draft names; English names are preserved as fallback.';
+	data.metadata.direct_requirement_source =
+		'Recipe requirement declarations from the Food Guide data modules.';
+
+	fs.writeFileSync(DATA_FILE, `${JSON.stringify(data)}\n`);
+	writeCsv(SUMMARY_CSV, summaryColumns(), summaryRows(data));
+	writeCsv(EDGES_CSV, edgeColumns(), edgeRows(data));
+
+	console.log(
+		JSON.stringify(
+			{
+				ingredients: data.ingredients.length,
+				recipes: Object.keys(data.recipes).length,
+				edges: data.edges.length,
+				bytes: fs.statSync(DATA_FILE).size,
+			},
+			null,
+			2,
+		),
+	);
 }
 
-for (const recipe of Object.values(data.recipes)) {
-	recipe.zhName = recipeZh[recipe.id] || recipe.name;
-	recipe.imageUrl = imageUrl(recipe.name);
+function addDirectRequirements(data, sourceRecipes) {
+	const knownIngredientIds = new Set(data.ingredients.map(ingredient => ingredient.id));
+
+	for (const recipe of Object.values(data.recipes)) {
+		const sourceRecipe = sourceRecipes[recipe.id];
+		const directNames = new Set();
+
+		for (const requirement of sourceRecipe?.requirements || []) {
+			collectRequirementNames(requirement, directNames);
+		}
+
+		recipe.directIngredientIds = [...expandDirectNames(directNames, knownIngredientIds)].sort();
+	}
 }
 
-const ingredientByKey = new Map(data.ingredients.map(ingredient => [ingredient.key, ingredient]));
-const ingredientById = new Map(data.ingredients.map(ingredient => [ingredient.id, ingredient]));
+function collectRequirementNames(requirement, directNames) {
+	if (!requirement || typeof requirement !== 'object') {
+		return;
+	}
 
-for (const edge of data.edges) {
-	const ingredient = ingredientByKey.get(edge.ingredientKey);
-	const recipe = data.recipes[edge.recipeId];
-	edge.ingredientName = ingredient?.name || edge.ingredientKey;
-	edge.ingredientZhName = ingredient?.zhName || edge.ingredientName;
-	edge.recipeName = recipe?.name || edge.recipeId;
-	edge.recipeZhName = recipe?.zhName || edge.recipeName;
-	edge.exampleCombo = edge.exampleCombo.map(item => {
-		const fullIngredient = ingredientByKey.get(item.key) || ingredientById.get(item.id);
-		return {
-			...item,
-			zhName: fullIngredient?.zhName || ingredientZh[item.id] || item.name,
-			imageUrl: fullIngredient?.imageUrl || imageUrl(item.name),
-		};
-	});
+	if (requirement.cancel) {
+		return;
+	}
+
+	if (requirement.name) {
+		directNames.add(requirement.name);
+	}
+
+	collectRequirementNames(requirement.item1, directNames);
+	collectRequirementNames(requirement.item2, directNames);
+	collectRequirementNames(requirement.item, directNames);
 }
 
-data.metadata.image_source = {
-	name: 'Bluehexagons Food Guide images',
-	url: 'https://bluehexagons.github.io/foodguide/img/',
-};
-data.metadata.zh_name_source = 'Manual Traditional Chinese draft names; English names are preserved as fallback.';
+function expandDirectNames(directNames, knownIngredientIds) {
+	const result = new Set();
+	const aliases = {
+		berries: ['berries', 'berries_cooked', 'berries_juicy', 'berries_juicy_cooked'],
+		cactus_flower: ['cactusflower'],
+		cactusflower: ['cactusflower'],
+		kelp: ['kelp', 'kelp_cooked', 'kelp_dried'],
+		lobster: ['wobster'],
+		smallmeat: ['morsel', 'morsel_cooked', 'morsel_dried'],
+		wobster_sheller_land: ['wobster'],
+	};
 
-fs.writeFileSync(DATA_FILE, `${JSON.stringify(data)}\n`);
-writeCsv(SUMMARY_CSV, summaryColumns(), summaryRows(data));
-writeCsv(EDGES_CSV, edgeColumns(), edgeRows(data));
+	for (const name of directNames) {
+		const candidates = [
+			name,
+			`${name}_cooked`,
+			`${name}_dried`,
+			...(aliases[name] || []),
+		];
 
-console.log(
-	JSON.stringify(
-		{
-			ingredients: data.ingredients.length,
-			recipes: Object.keys(data.recipes).length,
-			edges: data.edges.length,
-			bytes: fs.statSync(DATA_FILE).size,
-		},
-		null,
-		2,
-	),
-);
+		for (const candidate of candidates) {
+			if (knownIngredientIds.has(candidate)) {
+				result.add(candidate);
+			}
+		}
+	}
+
+	return result;
+}
 
 function imageUrl(name) {
 	return `${IMAGE_BASE_URL}${encodeURI(imageFile(name))}`;
@@ -299,6 +377,8 @@ function summaryColumns() {
 		'recipe_ids',
 		'warly_only_recipe_names',
 		'warly_only_recipe_zh_names',
+		'direct_recipe_names',
+		'direct_recipe_zh_names',
 	];
 }
 
@@ -306,6 +386,9 @@ function summaryRows({ ingredients, recipes }) {
 	return ingredients.map(ingredient => {
 		const ingredientRecipes = ingredient.recipeIds.map(id => recipes[id]).filter(Boolean);
 		const warlyRecipes = ingredientRecipes.filter(recipe => recipe.characterRequired);
+		const directRecipes = ingredientRecipes.filter(recipe =>
+			(recipe.directIngredientIds || []).includes(ingredient.id),
+		);
 		return {
 			ingredient_key: ingredient.key,
 			ingredient_id: ingredient.id,
@@ -318,6 +401,8 @@ function summaryRows({ ingredients, recipes }) {
 			recipe_ids: ingredientRecipes.map(recipe => recipe.id).join(' | '),
 			warly_only_recipe_names: warlyRecipes.map(recipe => recipe.name).join(' | '),
 			warly_only_recipe_zh_names: warlyRecipes.map(recipe => recipe.zhName).join(' | '),
+			direct_recipe_names: directRecipes.map(recipe => recipe.name).join(' | '),
+			direct_recipe_zh_names: directRecipes.map(recipe => recipe.zhName).join(' | '),
 		};
 	});
 }
@@ -343,6 +428,7 @@ function edgeColumns() {
 		'example_combo_keys',
 		'example_combo_names',
 		'example_combo_zh_names',
+		'direct_required_ingredient_ids',
 		'result_scope',
 	];
 }
@@ -372,6 +458,7 @@ function edgeRows({ edges, recipes, ingredients }) {
 			example_combo_keys: edge.exampleCombo.map(item => item.key).join(' + '),
 			example_combo_names: edge.exampleCombo.map(item => item.name).join(' + '),
 			example_combo_zh_names: edge.exampleCombo.map(item => item.zhName).join(' + '),
+			direct_required_ingredient_ids: (recipe?.directIngredientIds || []).join(' | '),
 			result_scope: edge.resultScope,
 		};
 	});

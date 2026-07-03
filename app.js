@@ -110,6 +110,7 @@ function renderIngredientList() {
 
 	const fragment = document.createDocumentFragment();
 	const ingredients = state.data.ingredients.filter(matchesIngredientSearch);
+	const previousScrollTop = els.ingredientList.scrollTop;
 	els.ingredientList.innerHTML = '';
 
 	for (const ingredient of ingredients) {
@@ -130,6 +131,7 @@ function renderIngredientList() {
 	}
 
 	els.ingredientList.append(fragment);
+	els.ingredientList.scrollTop = previousScrollTop;
 }
 
 function renderSelectionResults() {
@@ -138,7 +140,7 @@ function renderSelectionResults() {
 	}
 
 	const selectedIngredients = selectedIngredientObjects();
-	const resultEdges = sortedEdges(intersectionEdges(selectedIngredients));
+	const resultEdges = sortedEdges(intersectionEdges(selectedIngredients), selectedIngredients);
 	els.ingredientName.textContent = selectedIngredients.length
 		? `${selectedIngredients.length} 個食材`
 		: '尚未選擇';
@@ -257,10 +259,17 @@ function bestExampleEdge(edges, selectedIngredients) {
 	return best;
 }
 
-function sortedEdges(edges) {
+function sortedEdges(edges, selectedIngredients) {
 	return [...edges].sort((a, b) => {
 		const recipeA = state.data.recipes[a.recipeId];
 		const recipeB = state.data.recipes[b.recipeId];
+		const directDelta =
+			directMatchCount(recipeB, selectedIngredients) -
+			directMatchCount(recipeA, selectedIngredients);
+
+		if (directDelta !== 0) {
+			return directDelta;
+		}
 
 		if (state.sort === 'priority') {
 			return recipeB.priority - recipeA.priority || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
@@ -277,6 +286,16 @@ function sortedEdges(edges) {
 	});
 }
 
+function directMatchCount(recipe, selectedIngredients) {
+	const directIds = new Set(recipe.directIngredientIds || []);
+	return selectedIngredients.filter(ingredient => directIds.has(ingredient.id)).length;
+}
+
+function directMatchedIngredients(recipe, selectedIngredients) {
+	const directIds = new Set(recipe.directIngredientIds || []);
+	return selectedIngredients.filter(ingredient => directIds.has(ingredient.id));
+}
+
 function renderRecipeCard(edge, selectedIngredients) {
 	const recipe = state.data.recipes[edge.recipeId];
 	const node = els.recipeTemplate.content.firstElementChild.cloneNode(true);
@@ -284,12 +303,18 @@ function renderRecipeCard(edge, selectedIngredients) {
 	const combo = edge.exampleCombo;
 	const selectedIds = new Set(selectedIngredients.map(ingredient => ingredient.id));
 	const selectedKeys = new Set(selectedIngredients.map(ingredient => ingredient.key));
+	const directMatches = directMatchedIngredients(recipe, selectedIngredients);
+	const matchRow = node.querySelector('.match-row');
 
 	node.querySelector('.recipe-art').append(renderImage(recipe, 'recipe-image'));
 	node.querySelector('h2').textContent = displayName(recipe);
 	node.querySelector('.recipe-subtitle').textContent = recipe.name;
 	badge.textContent = recipe.characterRequired || 'DST';
 	badge.classList.toggle('is-warly', Boolean(recipe.characterRequired));
+	matchRow.textContent = directMatches.length
+		? `指定：${directMatches.map(displayName).join('、')}`
+		: '係數 / 填充';
+	matchRow.classList.toggle('is-direct', directMatches.length > 0);
 	node.querySelector('.recipe-stats').append(renderStats(recipe));
 	node.querySelector('.combo-row').append(renderCombo(combo, selectedIds, selectedKeys));
 
