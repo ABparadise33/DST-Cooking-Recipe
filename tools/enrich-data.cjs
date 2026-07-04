@@ -9,7 +9,9 @@ const EDGES_CSV = path.join(ROOT, 'data/dst_crockpot_ingredient_recipe_edges.csv
 const IMAGE_BASE_URL = 'https://bluehexagons.github.io/foodguide/img/';
 
 const tagZh = {
+	bug: '昆蟲係數',
 	dairy: '乳製係數',
+	decoration: '裝飾係數',
 	egg: '蛋類係數',
 	fat: '油脂係數',
 	fish: '魚類係數',
@@ -240,6 +242,12 @@ const recipeZh = {
 	lobsterdinner_dst: '龍蝦晚餐',
 };
 
+const extraIngredientTags = {
+	butterflywings: { bug: 1 },
+	moonbutterflywings: { bug: 1 },
+	forgetmelots: { decoration: 1 },
+};
+
 main().catch(error => {
 	console.error(error);
 	process.exit(1);
@@ -253,6 +261,10 @@ async function main() {
 	for (const ingredient of data.ingredients) {
 		ingredient.zhName = ingredientZh[ingredient.id] || ingredient.name;
 		ingredient.imageUrl = imageUrl(ingredient.name);
+		ingredient.tags = {
+			...(ingredient.tags || {}),
+			...(extraIngredientTags[ingredient.id] || {}),
+		};
 	}
 
 	for (const recipe of Object.values(data.recipes)) {
@@ -687,8 +699,20 @@ function edgeRows({ edges, recipes, ingredients }) {
 
 function formatTags(tags) {
 	return Object.entries(tags)
-		.map(([tag, value]) => `${tag}=${value}`)
+		.map(([tag, value]) => `${tag}=${formatTagValue(value)}`)
 		.join('; ');
+}
+
+function formatTagValue(value) {
+	if (value === true) {
+		return 'true';
+	}
+
+	if (value === false) {
+		return 'false';
+	}
+
+	return value;
 }
 
 function writeCsv(filePath, columns, rows) {

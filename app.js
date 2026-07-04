@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704j';
+const DATA_VERSION = '20260704k';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -20,7 +20,10 @@ const INGREDIENT_CATEGORIES = [
 	{ id: 'fruit', label: '水果', tag: 'fruit' },
 	{ id: 'egg', label: '蛋', tag: 'egg' },
 	{ id: 'sweetener', label: '甜味', tag: 'sweetener' },
+	{ id: 'dairy', label: '乳製', tag: 'dairy' },
+	{ id: 'bug', label: '昆蟲', tag: 'bug' },
 	{ id: 'monster', label: '怪物', tag: 'monster' },
+	{ id: 'decoration', label: '裝飾', tag: 'decoration' },
 	{ id: 'inedible', label: '不可食', tag: 'inedible' },
 	{ id: 'filler', label: '填充/其他' },
 ];
@@ -36,11 +39,14 @@ const ORIGIN_RANK = new Map(INGREDIENT_ORIGIN_CATEGORIES.map((origin, index) => 
 
 const FILLER_EXCLUDED_TAGS = new Set([
 	'egg',
+	'dairy',
 	'fish',
 	'fruit',
 	'inedible',
 	'meat',
 	'monster',
+	'bug',
+	'decoration',
 	'sweetener',
 	'veggie',
 ]);
@@ -134,6 +140,8 @@ const STAT_META = {
 
 const TAG_META = {
 	dairy: { label: '乳製係數', representativeId: 'goatmilk' },
+	bug: { label: '昆蟲係數', representativeId: 'butterflywings' },
+	decoration: { label: '裝飾係數', representativeId: 'forgetmelots' },
 	egg: { label: '蛋類係數', representativeId: 'bird_egg' },
 	fat: { label: '油脂係數', representativeId: 'butter' },
 	fish: { label: '魚類係數', representativeId: 'fishmeat' },
