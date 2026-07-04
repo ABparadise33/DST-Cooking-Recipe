@@ -9,8 +9,8 @@
 			content="Don't Starve Together Crock Pot ingredient reverse lookup."
 		>
 		<link rel="icon" href="favicon.svg" type="image/svg+xml">
-		<link rel="stylesheet" href="styles.css?v=20260704e">
-		<script src="app.js?v=20260704e" defer></script>
+		<link rel="stylesheet" href="styles.css?v=20260704f">
+		<script src="app.js?v=20260704f" defer></script>
 	</head>
 	<body>
 		<header class="site-header">
@@ -82,14 +82,21 @@
 		</main>
 
 		<template id="ingredient-template">
-			<button class="ingredient-option" type="button">
+			<div class="ingredient-option" role="option" tabindex="0">
 				<span class="ingredient-thumb"></span>
 				<span class="ingredient-option-text">
 					<span class="ingredient-option-name"></span>
 					<span class="ingredient-option-subtitle"></span>
 				</span>
-				<span class="ingredient-option-count"></span>
-			</button>
+				<span class="ingredient-option-actions">
+					<span class="ingredient-option-count"></span>
+					<span class="ingredient-stepper" hidden>
+						<button class="ingredient-qty-button ingredient-decrease" type="button">-</button>
+						<span class="ingredient-selected-count"></span>
+						<button class="ingredient-qty-button ingredient-increase" type="button">+</button>
+					</span>
+				</span>
+			</div>
 		</template>
 
 		<template id="recipe-template">

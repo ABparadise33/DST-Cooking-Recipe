@@ -250,7 +250,7 @@ select {
 
 .ingredient-option {
 	display: grid;
-	grid-template-columns: 38px minmax(0, 1fr) auto;
+	grid-template-columns: 38px minmax(0, 1fr) minmax(52px, auto);
 	align-items: center;
 	gap: 12px;
 	min-height: 58px;
@@ -276,6 +276,13 @@ select {
 	background: var(--moss);
 	color: #ffffff;
 	box-shadow: var(--shadow);
+}
+
+.ingredient-option-actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	min-width: 0;
 }
 
 .ingredient-thumb,
@@ -351,6 +358,65 @@ select {
 
 .ingredient-option.is-active .ingredient-option-count {
 	background: rgba(255, 255, 255, 0.18);
+}
+
+.ingredient-stepper {
+	display: inline-grid;
+	grid-template-columns: 30px minmax(38px, auto) 30px;
+	align-items: center;
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.36);
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.18);
+}
+
+.ingredient-stepper[hidden] {
+	display: none;
+}
+
+.ingredient-qty-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border: 0;
+	background: rgba(255, 255, 255, 0.2);
+	color: #ffffff;
+	font: inherit;
+	font-size: 18px;
+	font-weight: 900;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ingredient-qty-button:hover,
+.ingredient-qty-button:focus-visible {
+	background: rgba(255, 255, 255, 0.34);
+	outline: none;
+}
+
+.ingredient-qty-button:disabled {
+	color: rgba(255, 255, 255, 0.42);
+	cursor: default;
+}
+
+.ingredient-qty-button:disabled:hover,
+.ingredient-qty-button:disabled:focus-visible {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.ingredient-selected-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 38px;
+	height: 30px;
+	padding: 0 8px;
+	color: #ffffff;
+	font-size: 13px;
+	font-weight: 900;
+	white-space: nowrap;
 }
 
 .result-pane {

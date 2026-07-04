@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704e';
+const DATA_VERSION = '20260704f';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -354,15 +354,50 @@ function renderIngredientList() {
 
 	for (const ingredient of ingredients) {
 		const node = els.ingredientTemplate.content.firstElementChild.cloneNode(true);
-		const active = state.selectedKeys.includes(ingredient.key);
+		const selectedCount = selectedCountForKey(ingredient.key);
+		const active = selectedCount > 0;
+		const isFull = state.selectedKeys.length >= 4;
+		const display = displayName(ingredient);
 		node.dataset.key = ingredient.key;
 		node.classList.toggle('is-active', active);
+		node.classList.toggle('is-maxed', isFull);
 		node.setAttribute('aria-selected', String(active));
+		node.setAttribute('aria-label', `${display}，已選 ${selectedCount} 個`);
 		node.querySelector('.ingredient-thumb').append(renderImage(ingredient, 'ingredient-thumb-image'));
-		node.querySelector('.ingredient-option-name').textContent = displayName(ingredient);
+		node.querySelector('.ingredient-option-name').textContent = display;
 		node.querySelector('.ingredient-option-subtitle').textContent = ingredient.name;
-		node.querySelector('.ingredient-option-count').textContent = visibleRecipeCount(ingredient);
+		const count = node.querySelector('.ingredient-option-count');
+		count.textContent = visibleRecipeCount(ingredient);
+		count.hidden = active;
+		const stepper = node.querySelector('.ingredient-stepper');
+		const selectedCountNode = node.querySelector('.ingredient-selected-count');
+		const decrease = node.querySelector('.ingredient-decrease');
+		const increase = node.querySelector('.ingredient-increase');
+		stepper.hidden = !active;
+		selectedCountNode.textContent = `x${selectedCount}`;
+		decrease.disabled = !active;
+		increase.disabled = isFull;
+		decrease.setAttribute('aria-label', `減少 ${display}`);
+		increase.setAttribute('aria-label', `增加 ${display}`);
 		node.addEventListener('click', () => {
+			addIngredient(ingredient.key);
+			renderAll();
+		});
+		node.addEventListener('keydown', event => {
+			if (event.key !== 'Enter' && event.key !== ' ') {
+				return;
+			}
+			event.preventDefault();
+			addIngredient(ingredient.key);
+			renderAll();
+		});
+		decrease.addEventListener('click', event => {
+			event.stopPropagation();
+			removeIngredient(ingredient.key);
+			renderAll();
+		});
+		increase.addEventListener('click', event => {
+			event.stopPropagation();
 			addIngredient(ingredient.key);
 			renderAll();
 		});
@@ -520,15 +555,27 @@ function matchesIngredientSearch(ingredient) {
 
 function addIngredient(key) {
 	if (state.selectedKeys.length >= 4) {
-		state.selectedKeys = [...state.selectedKeys.slice(1), key];
 		return;
 	}
 
 	state.selectedKeys = [...state.selectedKeys, key];
 }
 
+function removeIngredient(key) {
+	const index = state.selectedKeys.lastIndexOf(key);
+	if (index === -1) {
+		return;
+	}
+
+	removeSelectedIngredient(index);
+}
+
 function removeSelectedIngredient(index) {
 	state.selectedKeys = state.selectedKeys.filter((_, selectedIndex) => selectedIndex !== index);
+}
+
+function selectedCountForKey(key) {
+	return state.selectedKeys.filter(selectedKey => selectedKey === key).length;
 }
 
 function selectedIngredientObjects() {
