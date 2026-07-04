@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260705a';
+const DATA_VERSION = '20260705b';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -18,6 +18,7 @@ const INGREDIENT_CATEGORIES = [
 	{ id: 'fish', label: '魚類', tag: 'fish' },
 	{ id: 'veggie', label: '蔬菜', tag: 'veggie' },
 	{ id: 'fruit', label: '水果', tag: 'fruit' },
+	{ id: 'crop', label: '農作物區' },
 	{ id: 'egg', label: '蛋', tag: 'egg' },
 	{ id: 'sweetener', label: '甜味', tag: 'sweetener' },
 	{ id: 'dairy', label: '乳製', tag: 'dairy' },
@@ -93,6 +94,38 @@ const CAVE_ONLY_INGREDIENT_IDS = new Set([
 	'refined_dust',
 	'wormlight',
 	'wormlight_lesser',
+]);
+
+const FARM_CROP_INGREDIENT_IDS = new Set([
+	'asparagus',
+	'asparagus_cooked',
+	'carrot',
+	'carrot_cooked',
+	'corn',
+	'corn_cooked',
+	'dragonfruit',
+	'dragonfruit_cooked',
+	'durian',
+	'durian_cooked',
+	'eggplant',
+	'eggplant_cooked',
+	'forgetmelots',
+	'garlic',
+	'garlic_cooked',
+	'onion',
+	'onion_cooked',
+	'pepper',
+	'pepper_cooked',
+	'pomegranate',
+	'pomegranate_cooked',
+	'potato',
+	'potato_cooked',
+	'pumpkin',
+	'pumpkin_cooked',
+	'tomato',
+	'tomato_cooked',
+	'watermelon',
+	'watermelon_cooked',
 ]);
 
 const COMMON_INGREDIENT_IDS = [
@@ -219,7 +252,7 @@ async function init() {
 
 		const data = await response.json();
 		state.data = prepareData(data);
-		state.selectedKeys = [pickDefaultIngredient(state.data.ingredients)];
+		state.selectedKeys = [];
 		render();
 	} catch (error) {
 		els.status.textContent = '資料載入失敗';
@@ -275,6 +308,12 @@ function prepareData(data) {
 	const ingredientMap = new Map(ingredients.map(ingredient => [ingredient.key, ingredient]));
 	const ingredientById = new Map(ingredients.map(ingredient => [ingredient.id, ingredient]));
 	const recipeList = Object.values(data.recipes).sort(compareRecipesForCooking);
+	const exampleEdgeByRecipeId = new Map();
+	for (const edge of data.edges) {
+		if (!exampleEdgeByRecipeId.has(edge.recipeId)) {
+			exampleEdgeByRecipeId.set(edge.recipeId, edge);
+		}
+	}
 
 	return {
 		...data,
@@ -282,15 +321,12 @@ function prepareData(data) {
 		ingredientMap,
 		ingredientById,
 		edgeMap,
+		exampleEdgeByRecipeId,
 		standardRecipeList: recipeList.filter(recipe => recipe.mode === 'together'),
 		warlyRecipeList: recipeList.filter(recipe =>
 			recipe.mode === 'together' || recipe.mode === 'warlydst',
 		),
 	};
-}
-
-function pickDefaultIngredient(ingredients) {
-	return ingredients.find(ingredient => ingredient.id === 'monstermeat')?.key ?? ingredients[0]?.key ?? '';
 }
 
 function render() {
@@ -526,6 +562,10 @@ function matchesIngredientCategory(ingredient, category) {
 		return !Object.keys(tags).some(tag => FILLER_EXCLUDED_TAGS.has(tag));
 	}
 
+	if (category.id === 'crop') {
+		return FARM_CROP_INGREDIENT_IDS.has(ingredient.id);
+	}
+
 	return Boolean(tags[category.tag]);
 }
 
@@ -547,11 +587,6 @@ function renderSelectionResults() {
 	els.resultCount.textContent = `${resultEdges.length} recipes`;
 	els.clearSelection.disabled = selectedIngredients.length === 0;
 	els.recipeGrid.innerHTML = '';
-
-	if (selectedIngredients.length === 0) {
-		els.recipeGrid.innerHTML = '<div class="empty-state">選擇食材後會顯示料理交集</div>';
-		return;
-	}
 
 	if (resultEdges.length === 0) {
 		els.recipeGrid.innerHTML = '<div class="empty-state">這組食材目前沒有共同料理結果</div>';
@@ -681,11 +716,31 @@ function visibleEdgesForIngredient(ingredient) {
 }
 
 function possibleEdges(selectedIngredients) {
+	if (selectedIngredients.length === 0) {
+		return allRecipeEdges();
+	}
+
 	if (selectedIngredients.length <= 1) {
 		return intersectionEdges(selectedIngredients);
 	}
 
 	return exactComboEdges(selectedIngredients);
+}
+
+function allRecipeEdges() {
+	const recipes = state.includeWarly ? state.data.warlyRecipeList : state.data.standardRecipeList;
+	return recipes.map(recipe => {
+		const edge = state.data.exampleEdgeByRecipeId.get(recipe.id);
+		if (edge) {
+			return edge;
+		}
+
+		return {
+			recipeId: recipe.id,
+			resultScope: recipe.mode === 'warlydst' ? 'warly' : 'standard',
+			exampleCombo: [],
+		};
+	});
 }
 
 function intersectionEdges(selectedIngredients) {
@@ -1064,6 +1119,13 @@ function requirementAtomValue(rule, totals, recipe) {
 }
 
 function relevanceLabel(recipe, selectedIngredients) {
+	if (selectedIngredients.length === 0) {
+		return {
+			text: '全部料理',
+			className: '',
+		};
+	}
+
 	const directMatches = directMatchedIngredients(recipe, selectedIngredients);
 	if (directMatches.length > 0) {
 		return {

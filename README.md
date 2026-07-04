@@ -5,9 +5,9 @@ A static GitHub Pages site for reverse-looking-up Don't Starve Together Crock Po
 ## Features
 
 - Search ingredients by English name, Chinese name, or internal id.
-- Filter ingredients by obtainment area (mainland, ocean/islands, cave) and common Crock Pot groups such as meat, fish, vegetable, fruit, egg, sweetener, dairy, bug, monster, decoration, inedible, and filler/other.
+- Filter ingredients by obtainment area (mainland, ocean/islands, cave) and common Crock Pot groups such as meat, fish, vegetable, fruit, farm crop, egg, sweetener, dairy, bug, monster, decoration, inedible, and filler/other.
 - Select up to four ingredient slots, including repeated ingredients, with inline `+`/`-` quantity controls for quick correction.
-- Start with Monster Meat selected and show common ingredients first in the default ingredient list.
+- Start with no selected ingredient, show all standard recipes, and keep common ingredients first in the default ingredient list.
 - Keep Warly-only recipes hidden by default.
 - Prioritize recipes that explicitly require the selected ingredient, then recipes whose coefficient requirements are already satisfied, then partial coefficient matches, then filler-only matches.
 - Show readable Chinese recipe requirements such as `肉類係數 >= 3` and `不可放 不可食用`.
