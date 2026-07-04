@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704f';
+const DATA_VERSION = '20260704g';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -8,7 +8,7 @@ const state = {
 	origin: 'all',
 	category: 'all',
 	includeWarly: false,
-	sort: 'name',
+	sort: 'relevance',
 };
 
 const INGREDIENT_CATEGORIES = [
@@ -836,36 +836,51 @@ function sortedEdges(edges, selectedIngredients) {
 		const recipeB = state.data.recipes[b.recipeId];
 		const relevanceA = relevanceByRecipeId.get(a.recipeId);
 		const relevanceB = relevanceByRecipeId.get(b.recipeId);
-		const tierDelta = relevanceA.tier - relevanceB.tier;
+		const selectedSortDelta = compareRecipesForSelectedSort(recipeA, recipeB);
 
-		if (tierDelta !== 0) {
-			return tierDelta;
+		if (selectedSortDelta !== null && selectedSortDelta !== 0) {
+			return selectedSortDelta;
 		}
 
-		const scoreDelta =
-			relevanceB.direct - relevanceA.direct ||
-			relevanceB.satisfied - relevanceA.satisfied ||
-			relevanceB.partial - relevanceA.partial ||
-			relevanceB.value - relevanceA.value;
-
-		if (scoreDelta !== 0) {
-			return scoreDelta;
+		const relevanceDelta = compareRelevance(relevanceA, relevanceB);
+		if (relevanceDelta !== 0) {
+			return relevanceDelta;
 		}
 
-		return compareRecipesForSelectedSort(recipeA, recipeB);
+		return compareRecipesByName(recipeA, recipeB);
 	});
 }
 
 function compareRecipesForSelectedSort(recipeA, recipeB) {
-	if (state.sort === 'priority') {
-		return recipeB.priority - recipeA.priority || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
+	if (state.sort === 'relevance') {
+		return null;
 	}
 
-	if (['health', 'hunger', 'sanity'].includes(state.sort)) {
-		return Number(recipeB[state.sort] || 0) - Number(recipeA[state.sort] || 0) ||
-			displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
+	if (state.sort === 'name') {
+		return compareRecipesByName(recipeA, recipeB);
 	}
 
+	const [field, direction = 'desc'] = state.sort.split('-');
+	if (['health', 'hunger', 'sanity', 'priority'].includes(field)) {
+		const valueA = Number(recipeA[field] || 0);
+		const valueB = Number(recipeB[field] || 0);
+		return direction === 'asc' ? valueA - valueB : valueB - valueA;
+	}
+
+	return compareRecipesByName(recipeA, recipeB);
+}
+
+function compareRelevance(relevanceA, relevanceB) {
+	return (
+		relevanceA.tier - relevanceB.tier ||
+		relevanceB.direct - relevanceA.direct ||
+		relevanceB.satisfied - relevanceA.satisfied ||
+		relevanceB.partial - relevanceA.partial ||
+		relevanceB.value - relevanceA.value
+	);
+}
+
+function compareRecipesByName(recipeA, recipeB) {
 	return (
 		Number(Boolean(recipeA.characterRequired)) - Number(Boolean(recipeB.characterRequired)) ||
 		displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant')
