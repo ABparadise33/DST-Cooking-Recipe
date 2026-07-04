@@ -103,7 +103,7 @@ a {
 	top: 89px;
 	align-self: start;
 	display: grid;
-	grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
+	grid-template-rows: auto auto auto auto auto auto minmax(0, 1fr);
 	gap: 14px;
 	max-height: calc(100vh - 113px);
 	min-height: 0;
@@ -193,6 +193,17 @@ select {
 	color: var(--muted);
 	font-size: 14px;
 	font-weight: 650;
+}
+
+.filter-group {
+	display: grid;
+	gap: 8px;
+}
+
+.filter-label {
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 900;
 }
 
 .category-tabs {
@@ -356,6 +367,12 @@ select {
 	border-bottom: 1px solid var(--line);
 }
 
+.selection-panel {
+	display: grid;
+	min-width: 0;
+	gap: 6px;
+}
+
 .eyebrow {
 	margin: 0 0 5px;
 	color: var(--berry);
@@ -396,6 +413,78 @@ h1 {
 
 .selected-list {
 	margin: 10px 0 8px;
+}
+
+.selected-list {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(58px, 76px));
+	gap: 8px;
+	align-items: stretch;
+}
+
+.cook-slot {
+	position: relative;
+	display: grid;
+	grid-template-rows: 1fr auto;
+	place-items: center;
+	gap: 3px;
+	aspect-ratio: 1;
+	min-width: 0;
+	padding: 6px;
+	border: 1px solid rgba(49, 92, 69, 0.2);
+	border-radius: 8px;
+	background:
+		linear-gradient(135deg, rgba(200, 157, 60, 0.18), rgba(49, 92, 69, 0.12)),
+		var(--surface);
+	color: var(--moss-dark);
+	font: inherit;
+	cursor: pointer;
+}
+
+.cook-slot::before {
+	position: absolute;
+	top: 5px;
+	left: 7px;
+	color: rgba(36, 33, 28, 0.42);
+	content: attr(data-slot);
+	font-size: 10px;
+	font-weight: 900;
+}
+
+.cook-slot.is-filled:hover,
+.cook-slot.is-filled:focus-visible {
+	border-color: var(--moss);
+	outline: none;
+	box-shadow: var(--shadow);
+}
+
+.cook-slot.is-empty {
+	cursor: default;
+	background: rgba(255, 255, 255, 0.5);
+	color: rgba(99, 95, 85, 0.7);
+}
+
+.cook-slot-empty {
+	font-size: 22px;
+	font-weight: 900;
+}
+
+.cook-slot-image {
+	width: min(46px, 74%);
+	height: min(46px, 74%);
+	object-fit: contain;
+}
+
+.cook-slot-name {
+	max-width: 100%;
+	overflow: hidden;
+	color: var(--moss-dark);
+	font-size: 10px;
+	font-weight: 900;
+	line-height: 1.1;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .tag-chip,
@@ -522,6 +611,16 @@ h1 {
 .match-row.is-direct {
 	background: rgba(123, 47, 69, 0.12);
 	color: var(--berry);
+}
+
+.match-row.is-condition {
+	background: rgba(49, 92, 69, 0.12);
+	color: var(--moss-dark);
+}
+
+.match-row.is-partial {
+	background: rgba(200, 157, 60, 0.14);
+	color: #6e4d0f;
 }
 
 .recipe-stats {

@@ -1,12 +1,13 @@
-const DATA_VERSION = '20260704d';
+const DATA_VERSION = '20260704e';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
 	data: null,
 	selectedKeys: [],
 	search: '',
+	origin: 'all',
 	category: 'all',
-	includeWarly: true,
+	includeWarly: false,
 	sort: 'name',
 };
 
@@ -23,6 +24,15 @@ const INGREDIENT_CATEGORIES = [
 	{ id: 'filler', label: '填充/其他' },
 ];
 
+const INGREDIENT_ORIGIN_CATEGORIES = [
+	{ id: 'all', label: '全部' },
+	{ id: 'land', label: '本島' },
+	{ id: 'ocean', label: '海洋' },
+	{ id: 'cave', label: '洞窟' },
+];
+
+const ORIGIN_RANK = new Map(INGREDIENT_ORIGIN_CATEGORIES.map((origin, index) => [origin.id, index]));
+
 const FILLER_EXCLUDED_TAGS = new Set([
 	'egg',
 	'fish',
@@ -32,6 +42,50 @@ const FILLER_EXCLUDED_TAGS = new Set([
 	'monster',
 	'sweetener',
 	'veggie',
+]);
+
+const OCEAN_ONLY_INGREDIENT_IDS = new Set([
+	'barnacle',
+	'fig',
+	'fishmeat',
+	'fishmeat_small',
+	'forgetmelots',
+	'kelp',
+	'moonbutterflywings',
+	'oceanfish_medium_1_inv',
+	'oceanfish_medium_2_inv',
+	'oceanfish_medium_3_inv',
+	'oceanfish_medium_4_inv',
+	'oceanfish_medium_5_inv',
+	'oceanfish_medium_6_inv',
+	'oceanfish_medium_7_inv',
+	'oceanfish_medium_8_inv',
+	'oceanfish_medium_9_inv',
+	'oceanfish_small_1_inv',
+	'oceanfish_small_2_inv',
+	'oceanfish_small_3_inv',
+	'oceanfish_small_4_inv',
+	'oceanfish_small_5_inv',
+	'oceanfish_small_6_inv',
+	'oceanfish_small_7_inv',
+	'oceanfish_small_8_inv',
+	'oceanfish_small_9_inv',
+	'rock_avocado_fruit_ripe',
+	'wobster',
+]);
+
+const CAVE_ONLY_INGREDIENT_IDS = new Set([
+	'batnose',
+	'batwing',
+	'cave_banana',
+	'cutlichen',
+	'eel',
+	'milkywhites',
+	'moon_mushroom',
+	'pondeel',
+	'refined_dust',
+	'wormlight',
+	'wormlight_lesser',
 ]);
 
 const COMMON_INGREDIENT_IDS = [
@@ -124,6 +178,7 @@ const RECIPE_NAME_VARIANTS = {
 const els = {
 	status: document.querySelector('#dataset-status'),
 	search: document.querySelector('#ingredient-search'),
+	origins: document.querySelector('#ingredient-origins'),
 	categories: document.querySelector('#ingredient-categories'),
 	includeWarly: document.querySelector('#include-warly'),
 	sort: document.querySelector('#recipe-sort'),
@@ -220,9 +275,40 @@ function render() {
 }
 
 function renderAll() {
+	renderIngredientOrigins();
 	renderIngredientCategories();
 	renderIngredientList();
 	renderSelectionResults();
+}
+
+function renderIngredientOrigins() {
+	if (!state.data) {
+		return;
+	}
+
+	const fragment = document.createDocumentFragment();
+	els.origins.innerHTML = '';
+
+	for (const origin of INGREDIENT_ORIGIN_CATEGORIES) {
+		const button = document.createElement('button');
+		const active = state.origin === origin.id;
+		button.className = 'category-tab origin-tab';
+		button.type = 'button';
+		button.dataset.origin = origin.id;
+		button.setAttribute('role', 'tab');
+		button.setAttribute('aria-selected', String(active));
+		button.classList.toggle('is-active', active);
+		button.textContent = `${origin.label} ${originIngredientCount(origin)}`;
+		button.addEventListener('click', () => {
+			state.origin = origin.id;
+			renderIngredientOrigins();
+			renderIngredientCategories();
+			renderIngredientList();
+		});
+		fragment.append(button);
+	}
+
+	els.origins.append(fragment);
 }
 
 function renderIngredientCategories() {
@@ -288,14 +374,19 @@ function renderIngredientList() {
 }
 
 function sortedIngredientsForActiveView(ingredients) {
-	if (state.category !== 'all' || state.search) {
+	if (state.search) {
 		return ingredients;
 	}
 
-	return [...ingredients].sort(compareCommonIngredients);
+	return [...ingredients].sort(compareIngredientListOrder);
 }
 
-function compareCommonIngredients(a, b) {
+function compareIngredientListOrder(a, b) {
+	const originDelta = ingredientOriginRank(a) - ingredientOriginRank(b);
+	if (originDelta !== 0) {
+		return originDelta;
+	}
+
 	const rankA = COMMON_INGREDIENT_RANK.get(a.id) ?? Number.POSITIVE_INFINITY;
 	const rankB = COMMON_INGREDIENT_RANK.get(b.id) ?? Number.POSITIVE_INFINITY;
 
@@ -306,16 +397,64 @@ function compareCommonIngredients(a, b) {
 	return displayName(a).localeCompare(displayName(b), 'zh-Hant');
 }
 
+function ingredientOriginRank(ingredient) {
+	return ORIGIN_RANK.get(ingredientOrigin(ingredient)) ?? Number.POSITIVE_INFINITY;
+}
+
+function originIngredientCount(origin) {
+	return state.data.ingredients.filter(ingredient =>
+		matchesIngredientOrigin(ingredient, origin) &&
+		matchesIngredientCategory(ingredient, activeCategory()),
+	).length;
+}
+
 function categoryIngredientCount(category) {
-	return state.data.ingredients.filter(ingredient => matchesIngredientCategory(ingredient, category)).length;
+	return state.data.ingredients.filter(ingredient =>
+		matchesIngredientOrigin(ingredient, activeOrigin()) &&
+		matchesIngredientCategory(ingredient, category),
+	).length;
 }
 
 function matchesIngredientFilters(ingredient) {
-	return matchesIngredientCategory(ingredient, activeCategory()) && matchesIngredientSearch(ingredient);
+	return matchesIngredientOrigin(ingredient, activeOrigin()) &&
+		matchesIngredientCategory(ingredient, activeCategory()) &&
+		matchesIngredientSearch(ingredient);
+}
+
+function activeOrigin() {
+	return INGREDIENT_ORIGIN_CATEGORIES.find(origin => origin.id === state.origin) ??
+		INGREDIENT_ORIGIN_CATEGORIES[0];
 }
 
 function activeCategory() {
 	return INGREDIENT_CATEGORIES.find(category => category.id === state.category) ?? INGREDIENT_CATEGORIES[0];
+}
+
+function matchesIngredientOrigin(ingredient, origin) {
+	if (!origin || origin.id === 'all') {
+		return true;
+	}
+
+	return ingredientOrigin(ingredient) === origin.id;
+}
+
+function ingredientOrigin(ingredient) {
+	const id = baseIngredientId(ingredient.id);
+	if (OCEAN_ONLY_INGREDIENT_IDS.has(id)) {
+		return 'ocean';
+	}
+
+	if (CAVE_ONLY_INGREDIENT_IDS.has(id)) {
+		return 'cave';
+	}
+
+	return 'land';
+}
+
+function baseIngredientId(id) {
+	return id
+		.replace(/_cooked$/, '')
+		.replace(/_dried$/, '');
 }
 
 function matchesIngredientCategory(ingredient, category) {
@@ -344,7 +483,7 @@ function renderSelectionResults() {
 	els.ingredientTags.innerHTML = '';
 	els.ingredientTags.append(renderSharedTags(selectedIngredients));
 	els.selectedIngredients.innerHTML = '';
-	els.selectedIngredients.append(renderSelectedChips(selectedIngredients));
+	els.selectedIngredients.append(renderCookingSlots(selectedIngredients));
 	els.resultCount.textContent = `${resultEdges.length} recipes`;
 	els.clearSelection.disabled = selectedIngredients.length === 0;
 	els.recipeGrid.innerHTML = '';
@@ -639,31 +778,182 @@ function compareRecipesForCooking(a, b) {
 }
 
 function sortedEdges(edges, selectedIngredients) {
+	const relevanceByRecipeId = new Map();
+	for (const edge of edges) {
+		const recipe = state.data.recipes[edge.recipeId];
+		relevanceByRecipeId.set(edge.recipeId, recipeRelevance(recipe, selectedIngredients));
+	}
+
 	return [...edges].sort((a, b) => {
 		const recipeA = state.data.recipes[a.recipeId];
 		const recipeB = state.data.recipes[b.recipeId];
-		const directDelta =
-			directMatchCount(recipeB, selectedIngredients) -
-			directMatchCount(recipeA, selectedIngredients);
+		const relevanceA = relevanceByRecipeId.get(a.recipeId);
+		const relevanceB = relevanceByRecipeId.get(b.recipeId);
+		const tierDelta = relevanceA.tier - relevanceB.tier;
 
-		if (directDelta !== 0) {
-			return directDelta;
+		if (tierDelta !== 0) {
+			return tierDelta;
 		}
 
-		if (state.sort === 'priority') {
-			return recipeB.priority - recipeA.priority || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
+		const scoreDelta =
+			relevanceB.direct - relevanceA.direct ||
+			relevanceB.satisfied - relevanceA.satisfied ||
+			relevanceB.partial - relevanceA.partial ||
+			relevanceB.value - relevanceA.value;
+
+		if (scoreDelta !== 0) {
+			return scoreDelta;
 		}
 
-		if (['health', 'hunger', 'sanity'].includes(state.sort)) {
-			return Number(recipeB[state.sort] || 0) - Number(recipeA[state.sort] || 0) ||
-				displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
-		}
-
-		return (
-			Number(Boolean(recipeA.characterRequired)) - Number(Boolean(recipeB.characterRequired)) ||
-			displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant')
-		);
+		return compareRecipesForSelectedSort(recipeA, recipeB);
 	});
+}
+
+function compareRecipesForSelectedSort(recipeA, recipeB) {
+	if (state.sort === 'priority') {
+		return recipeB.priority - recipeA.priority || displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
+	}
+
+	if (['health', 'hunger', 'sanity'].includes(state.sort)) {
+		return Number(recipeB[state.sort] || 0) - Number(recipeA[state.sort] || 0) ||
+			displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant');
+	}
+
+	return (
+		Number(Boolean(recipeA.characterRequired)) - Number(Boolean(recipeB.characterRequired)) ||
+		displayName(recipeA).localeCompare(displayName(recipeB), 'zh-Hant')
+	);
+}
+
+function recipeRelevance(recipe, selectedIngredients) {
+	const direct = directMatchCount(recipe, selectedIngredients);
+	const conditionStats = requirementConditionStats(recipe, selectedIngredients);
+	const tier = direct > 0 ? 0 : conditionStats.satisfied > 0 ? 1 : conditionStats.partial > 0 ? 2 : 3;
+
+	return {
+		tier,
+		direct,
+		satisfied: conditionStats.satisfied,
+		partial: conditionStats.partial,
+		value: conditionStats.value,
+	};
+}
+
+function requirementConditionStats(recipe, selectedIngredients) {
+	const totals = totalsForCombo(selectedIngredients);
+	const atoms = requirementAtoms(recipe.requirementRules || [])
+		.filter(atom => !atom.negated);
+	let satisfied = 0;
+	let partial = 0;
+	let value = 0;
+
+	for (const atom of atoms) {
+		const atomValue = requirementAtomValue(atom.rule, totals, recipe);
+		if (atomValue <= 0) {
+			continue;
+		}
+
+		value += atomValue;
+		if (evaluateRule(atom.rule, totals, recipe)) {
+			satisfied += 1;
+		} else {
+			partial += 1;
+		}
+	}
+
+	return { satisfied, partial, value };
+}
+
+function requirementAtoms(rules) {
+	return rules.flatMap(rule => requirementAtomsForRule(rule, false));
+}
+
+function requirementAtomsForRule(rule, negated) {
+	if (!rule) {
+		return [];
+	}
+
+	if (rule.type === 'NOTTest') {
+		return requirementAtomsForRule(rule.item, true);
+	}
+
+	if (rule.type === 'ORTest') {
+		return [
+			...requirementAtomsForRule(rule.item1, negated),
+			...requirementAtomsForRule(rule.item2, negated),
+		];
+	}
+
+	if (rule.type === 'ANDTest') {
+		return [
+			...requirementAtomsForRule(rule.item1, negated),
+			...requirementAtomsForRule(rule.item2, negated),
+		];
+	}
+
+	if (rule.type === 'TAGTest' || rule.type === 'NAMETest' || rule.type === 'SPECIFICTest') {
+		return [{ rule, negated }];
+	}
+
+	return [];
+}
+
+function requirementAtomValue(rule, totals, recipe) {
+	if (rule.type === 'TAGTest') {
+		return totals.tags[rule.tag] || 0;
+	}
+
+	if (rule.type === 'NAMETest') {
+		return nameValue(rule.name, totals, recipe);
+	}
+
+	if (rule.type === 'SPECIFICTest') {
+		return totals.names[rule.name] || 0;
+	}
+
+	return 0;
+}
+
+function relevanceLabel(recipe, selectedIngredients) {
+	const directMatches = directMatchedIngredients(recipe, selectedIngredients);
+	if (directMatches.length > 0) {
+		return {
+			text: `指定：${summarizeIngredientNames(directMatches)}`,
+			className: 'is-direct',
+		};
+	}
+
+	const relevance = recipeRelevance(recipe, selectedIngredients);
+	if (relevance.satisfied > 0) {
+		return {
+			text: '係數已符合',
+			className: 'is-condition',
+		};
+	}
+
+	if (relevance.partial > 0) {
+		return {
+			text: '係數不足',
+			className: 'is-partial',
+		};
+	}
+
+	return {
+		text: '填充可用',
+		className: '',
+	};
+}
+
+function summarizeIngredientNames(ingredients) {
+	const counts = new Map();
+	for (const ingredient of ingredients) {
+		const name = displayName(ingredient);
+		counts.set(name, (counts.get(name) || 0) + 1);
+	}
+
+	return [...counts.entries()]
+		.map(([name, count]) => count > 1 ? `${name} x${count}` : name)
+		.join('、');
 }
 
 function directMatchCount(recipe, selectedIngredients) {
@@ -680,18 +970,19 @@ function renderRecipeCard(edge, selectedIngredients) {
 	const recipe = state.data.recipes[edge.recipeId];
 	const node = els.recipeTemplate.content.firstElementChild.cloneNode(true);
 	const badge = node.querySelector('.badge');
-	const directMatches = directMatchedIngredients(recipe, selectedIngredients);
 	const matchRow = node.querySelector('.match-row');
+	const matchLabel = relevanceLabel(recipe, selectedIngredients);
 
 	node.querySelector('.recipe-art').append(renderImage(recipe, 'recipe-image'));
 	node.querySelector('h2').textContent = displayName(recipe);
 	node.querySelector('.recipe-subtitle').textContent = recipe.name;
 	badge.textContent = recipe.characterRequired || 'DST';
 	badge.classList.toggle('is-warly', Boolean(recipe.characterRequired));
-	matchRow.textContent = directMatches.length
-		? `指定：${directMatches.map(displayName).join('、')}`
-		: '係數 / 填充';
-	matchRow.classList.toggle('is-direct', directMatches.length > 0);
+	matchRow.textContent = matchLabel.text;
+	matchRow.className = 'match-row';
+	if (matchLabel.className) {
+		matchRow.classList.add(matchLabel.className);
+	}
 	appendTo(node, '.recipe-stats', renderStats(recipe));
 	appendTo(node, '.recipe-meta', renderRecipeMeta(recipe));
 	appendTo(node, '.recipe-requirements', renderRequirementBoard(recipe));
@@ -963,15 +1254,33 @@ function renderSharedTags(selectedIngredients) {
 	return fragment;
 }
 
-function renderSelectedChips(selectedIngredients) {
+function renderCookingSlots(selectedIngredients) {
 	const fragment = document.createDocumentFragment();
-	for (const [index, ingredient] of selectedIngredients.entries()) {
+	for (let index = 0; index < 4; index++) {
+		const ingredient = selectedIngredients[index];
 		const chip = document.createElement('button');
-		chip.className = 'selected-chip';
+		chip.className = 'cook-slot';
 		chip.type = 'button';
+		chip.dataset.slot = String(index + 1);
+
+		if (!ingredient) {
+			chip.classList.add('is-empty');
+			chip.disabled = true;
+			chip.setAttribute('aria-label', `第 ${index + 1} 格空槽`);
+			const empty = document.createElement('span');
+			empty.className = 'cook-slot-empty';
+			empty.textContent = index + 1;
+			chip.append(empty);
+			fragment.append(chip);
+			continue;
+		}
+
+		chip.classList.add('is-filled');
 		chip.title = `移除 ${displayName(ingredient)}`;
-		chip.append(renderImage(ingredient, 'selected-chip-image'));
+		chip.setAttribute('aria-label', `移除第 ${index + 1} 格 ${displayName(ingredient)}`);
+		chip.append(renderImage(ingredient, 'cook-slot-image'));
 		const label = document.createElement('span');
+		label.className = 'cook-slot-name';
 		label.textContent = displayName(ingredient);
 		chip.append(label);
 		chip.addEventListener('click', () => {

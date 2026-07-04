@@ -9,8 +9,8 @@
 			content="Don't Starve Together Crock Pot ingredient reverse lookup."
 		>
 		<link rel="icon" href="favicon.svg" type="image/svg+xml">
-		<link rel="stylesheet" href="styles.css?v=20260704d">
-		<script src="app.js?v=20260704d" defer></script>
+		<link rel="stylesheet" href="styles.css?v=20260704e">
+		<script src="app.js?v=20260704e" defer></script>
 	</head>
 	<body>
 		<header class="site-header">
@@ -38,10 +38,17 @@
 						placeholder="搜尋食材 / ingredient"
 					>
 				</div>
-				<div class="category-tabs" id="ingredient-categories" role="tablist" aria-label="食材分類"></div>
+				<div class="filter-group">
+					<div class="filter-label">取得地</div>
+					<div class="category-tabs" id="ingredient-origins" role="tablist" aria-label="取得地分類"></div>
+				</div>
+				<div class="filter-group">
+					<div class="filter-label">種類</div>
+					<div class="category-tabs" id="ingredient-categories" role="tablist" aria-label="食材分類"></div>
+				</div>
 				<div class="control-row compact">
 					<label class="switch">
-						<input id="include-warly" type="checkbox" checked>
+						<input id="include-warly" type="checkbox">
 						<span>包含 Warly</span>
 					</label>
 					<label class="sort-control" for="recipe-sort">
@@ -62,8 +69,8 @@
 
 			<section class="result-pane" aria-live="polite">
 				<div class="result-heading">
-					<div>
-						<p class="eyebrow">Selected Ingredients</p>
+					<div class="selection-panel">
+						<p class="eyebrow">Cooking Pot</p>
 						<h1 id="ingredient-name">-</h1>
 						<div class="selected-list" id="selected-ingredients"></div>
 						<div class="tag-list" id="ingredient-tags"></div>
