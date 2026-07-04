@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704h';
+const DATA_VERSION = '20260704i';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -116,17 +116,17 @@ const COMMON_INGREDIENT_RANK = new Map(
 
 const STAT_META = {
 	health: {
-		iconUrl: 'assets/status-health.png',
+		iconUrl: `assets/status-health.png?v=${DATA_VERSION}`,
 		label: '生命',
 		sortLabel: '回血量',
 	},
 	hunger: {
-		iconUrl: 'assets/status-hunger.png',
+		iconUrl: `assets/status-hunger.png?v=${DATA_VERSION}`,
 		label: '飽食',
 		sortLabel: '飽食度',
 	},
 	sanity: {
-		iconUrl: 'assets/status-sanity.png',
+		iconUrl: `assets/status-sanity.png?v=${DATA_VERSION}`,
 		label: '理智',
 		sortLabel: '理智值',
 	},
