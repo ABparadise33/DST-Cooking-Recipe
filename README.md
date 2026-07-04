@@ -15,7 +15,7 @@ A static GitHub Pages site for reverse-looking-up Don't Starve Together Crock Po
 - Show ingredient and recipe icons from the Food Guide image set.
 - Show health, hunger, and sanity with local Don't Starve-style status icons.
 - Keep English names while adding Traditional Chinese `zhName` fields.
-- Filter Warly-only recipes and sort by relevance, name, health, hunger, sanity, or priority, including high-to-low and low-to-high stat ordering.
+- Filter Warly-only recipes, keep the recipe sort menu simple, and use result-toolbar status icons for high-to-low or low-to-high health, hunger, and sanity ordering.
 
 ## Local Preview
 

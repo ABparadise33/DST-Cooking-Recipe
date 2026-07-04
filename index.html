@@ -9,8 +9,8 @@
 			content="Don't Starve Together Crock Pot ingredient reverse lookup."
 		>
 		<link rel="icon" href="favicon.svg" type="image/svg+xml">
-		<link rel="stylesheet" href="styles.css?v=20260704g">
-		<script src="app.js?v=20260704g" defer></script>
+		<link rel="stylesheet" href="styles.css?v=20260704h">
+		<script src="app.js?v=20260704h" defer></script>
 	</head>
 	<body>
 		<header class="site-header">
@@ -54,15 +54,11 @@
 					<label class="sort-control" for="recipe-sort">
 						<span>排序</span>
 						<select id="recipe-sort">
-							<option value="relevance">相關性</option>
 							<option value="name">名稱</option>
-							<option value="health-desc">回血量 高到低</option>
-							<option value="health-asc">回血量 低到高</option>
-							<option value="hunger-desc">飽食度 高到低</option>
-							<option value="hunger-asc">飽食度 低到高</option>
-							<option value="sanity-desc">理智值 高到低</option>
-							<option value="sanity-asc">理智值 低到高</option>
-							<option value="priority-desc">遊戲優先級</option>
+							<option value="hunger">飽食度</option>
+							<option value="health">回血量</option>
+							<option value="sanity">理智值</option>
+							<option value="priority">遊戲優先級</option>
 						</select>
 					</label>
 				</div>
@@ -80,6 +76,23 @@
 						<div class="tag-list" id="ingredient-tags"></div>
 					</div>
 					<div class="result-count" id="result-count">0 recipes</div>
+				</div>
+				<div class="stat-sort-toolbar" id="stat-sort-controls" aria-label="狀態排序">
+					<button class="stat-sort-button is-reset" type="button" data-stat-sort="reset">
+						<span class="stat-sort-letter" aria-hidden="true">A</span>
+					</button>
+					<button class="stat-sort-button" type="button" data-stat-sort="health">
+						<img class="stat-sort-icon" src="assets/status-health.png" alt="">
+						<span class="stat-sort-arrow" aria-hidden="true">↕</span>
+					</button>
+					<button class="stat-sort-button" type="button" data-stat-sort="hunger">
+						<img class="stat-sort-icon" src="assets/status-hunger.png" alt="">
+						<span class="stat-sort-arrow" aria-hidden="true">↕</span>
+					</button>
+					<button class="stat-sort-button" type="button" data-stat-sort="sanity">
+						<img class="stat-sort-icon" src="assets/status-sanity.png" alt="">
+						<span class="stat-sort-arrow" aria-hidden="true">↕</span>
+					</button>
 				</div>
 				<div class="recipe-grid" id="recipe-grid"></div>
 			</section>

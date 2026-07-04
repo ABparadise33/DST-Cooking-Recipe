@@ -468,6 +468,89 @@ h1 {
 	font-weight: 900;
 }
 
+.stat-sort-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: -4px 0 16px;
+}
+
+.stat-sort-button {
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	width: 48px;
+	height: 42px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.72);
+	color: var(--muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.stat-sort-button:hover,
+.stat-sort-button:focus-visible {
+	border-color: rgba(49, 92, 69, 0.45);
+	background: var(--surface);
+	outline: none;
+}
+
+.stat-sort-button.is-active {
+	border-color: var(--moss);
+	background: var(--ink);
+	color: #ffffff;
+	box-shadow: var(--shadow);
+}
+
+.stat-sort-button:disabled {
+	opacity: 0.45;
+	cursor: default;
+	box-shadow: none;
+}
+
+.stat-sort-icon {
+	width: 30px;
+	height: 30px;
+	object-fit: contain;
+}
+
+.stat-sort-letter {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 999px;
+	background: rgba(200, 157, 60, 0.18);
+	color: inherit;
+	font-size: 21px;
+	font-weight: 950;
+	line-height: 1;
+}
+
+.stat-sort-arrow {
+	position: absolute;
+	right: 4px;
+	bottom: 2px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 16px;
+	border-radius: 999px;
+	background: rgba(36, 33, 28, 0.78);
+	color: #ffffff;
+	font-size: 12px;
+	font-weight: 950;
+	line-height: 1;
+}
+
+.stat-sort-button.is-active .stat-sort-arrow {
+	background: rgba(255, 255, 255, 0.9);
+	color: var(--ink);
+}
+
 .tag-list,
 .selected-list,
 .recipe-meta,

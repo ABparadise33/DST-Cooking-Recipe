@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704g';
+const DATA_VERSION = '20260704h';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -8,7 +8,8 @@ const state = {
 	origin: 'all',
 	category: 'all',
 	includeWarly: false,
-	sort: 'relevance',
+	sort: 'name',
+	statSort: null,
 };
 
 const INGREDIENT_CATEGORIES = [
@@ -117,14 +118,17 @@ const STAT_META = {
 	health: {
 		iconUrl: 'assets/status-health.png',
 		label: '生命',
+		sortLabel: '回血量',
 	},
 	hunger: {
 		iconUrl: 'assets/status-hunger.png',
 		label: '飽食',
+		sortLabel: '飽食度',
 	},
 	sanity: {
 		iconUrl: 'assets/status-sanity.png',
 		label: '理智',
+		sortLabel: '理智值',
 	},
 };
 
@@ -188,6 +192,7 @@ const els = {
 	ingredientTags: document.querySelector('#ingredient-tags'),
 	selectedIngredients: document.querySelector('#selected-ingredients'),
 	resultCount: document.querySelector('#result-count'),
+	statSortControls: document.querySelector('#stat-sort-controls'),
 	recipeGrid: document.querySelector('#recipe-grid'),
 	ingredientTemplate: document.querySelector('#ingredient-template'),
 	recipeTemplate: document.querySelector('#recipe-template'),
@@ -227,6 +232,17 @@ function bindControls() {
 
 	els.sort.addEventListener('change', event => {
 		state.sort = event.target.value;
+		state.statSort = null;
+		renderSelectionResults();
+	});
+
+	els.statSortControls.addEventListener('click', event => {
+		const button = event.target.closest('.stat-sort-button');
+		if (!button || button.disabled) {
+			return;
+		}
+
+		setStatSort(button.dataset.statSort);
 		renderSelectionResults();
 	});
 
@@ -512,6 +528,7 @@ function renderSelectionResults() {
 
 	const selectedIngredients = selectedIngredientObjects();
 	const resultEdges = sortedEdges(possibleEdges(selectedIngredients), selectedIngredients);
+	renderStatSortControls(resultEdges.length > 0);
 	els.ingredientName.textContent = selectedIngredients.length
 		? `${selectedIngredients.length} 個食材`
 		: '尚未選擇';
@@ -538,6 +555,64 @@ function renderSelectionResults() {
 		fragment.append(renderRecipeCard(edge, selectedIngredients));
 	}
 	els.recipeGrid.append(fragment);
+}
+
+function setStatSort(action) {
+	if (action === 'reset') {
+		state.statSort = null;
+		return;
+	}
+
+	if (!STAT_META[action]) {
+		return;
+	}
+
+	if (state.statSort?.field === action) {
+		state.statSort = {
+			field: action,
+			direction: state.statSort.direction === 'desc' ? 'asc' : 'desc',
+		};
+	} else {
+		state.statSort = {
+			field: action,
+			direction: 'desc',
+		};
+	}
+
+	state.sort = 'name';
+	els.sort.value = 'name';
+}
+
+function renderStatSortControls(hasResults) {
+	if (!els.statSortControls) {
+		return;
+	}
+
+	for (const button of els.statSortControls.querySelectorAll('.stat-sort-button')) {
+		const action = button.dataset.statSort;
+		const isReset = action === 'reset';
+		const active = isReset ? !state.statSort : state.statSort?.field === action;
+		const direction = active && state.statSort?.field === action ? state.statSort.direction : 'none';
+		button.classList.toggle('is-active', active);
+		button.disabled = !hasResults;
+		button.dataset.direction = direction;
+		button.setAttribute('aria-pressed', String(active));
+
+		if (isReset) {
+			button.title = '使用目前排序';
+			button.setAttribute('aria-label', '使用目前排序');
+			continue;
+		}
+
+		const meta = STAT_META[action];
+		const directionLabel = direction === 'asc' ? '低到高' : '高到低';
+		button.title = `${meta.sortLabel} ${directionLabel}`;
+		button.setAttribute('aria-label', `${meta.sortLabel} ${directionLabel}`);
+		const arrow = button.querySelector('.stat-sort-arrow');
+		if (arrow) {
+			arrow.textContent = direction === 'asc' ? '↑' : direction === 'desc' ? '↓' : '↕';
+		}
+	}
 }
 
 function matchesIngredientSearch(ingredient) {
@@ -836,10 +911,10 @@ function sortedEdges(edges, selectedIngredients) {
 		const recipeB = state.data.recipes[b.recipeId];
 		const relevanceA = relevanceByRecipeId.get(a.recipeId);
 		const relevanceB = relevanceByRecipeId.get(b.recipeId);
-		const selectedSortDelta = compareRecipesForSelectedSort(recipeA, recipeB);
+		const statSortDelta = compareRecipesForActiveStatSort(recipeA, recipeB);
 
-		if (selectedSortDelta !== null && selectedSortDelta !== 0) {
-			return selectedSortDelta;
+		if (statSortDelta !== null && statSortDelta !== 0) {
+			return statSortDelta;
 		}
 
 		const relevanceDelta = compareRelevance(relevanceA, relevanceB);
@@ -847,24 +922,28 @@ function sortedEdges(edges, selectedIngredients) {
 			return relevanceDelta;
 		}
 
-		return compareRecipesByName(recipeA, recipeB);
+		return compareRecipesForSelectedSort(recipeA, recipeB);
 	});
 }
 
-function compareRecipesForSelectedSort(recipeA, recipeB) {
-	if (state.sort === 'relevance') {
+function compareRecipesForActiveStatSort(recipeA, recipeB) {
+	if (!state.statSort) {
 		return null;
 	}
 
-	if (state.sort === 'name') {
-		return compareRecipesByName(recipeA, recipeB);
+	const valueA = Number(recipeA[state.statSort.field] || 0);
+	const valueB = Number(recipeB[state.statSort.field] || 0);
+	return state.statSort.direction === 'asc' ? valueA - valueB : valueB - valueA;
+}
+
+function compareRecipesForSelectedSort(recipeA, recipeB) {
+	if (state.sort === 'priority') {
+		return recipeB.priority - recipeA.priority || compareRecipesByName(recipeA, recipeB);
 	}
 
-	const [field, direction = 'desc'] = state.sort.split('-');
-	if (['health', 'hunger', 'sanity', 'priority'].includes(field)) {
-		const valueA = Number(recipeA[field] || 0);
-		const valueB = Number(recipeB[field] || 0);
-		return direction === 'asc' ? valueA - valueB : valueB - valueA;
+	if (['health', 'hunger', 'sanity'].includes(state.sort)) {
+		return Number(recipeB[state.sort] || 0) - Number(recipeA[state.sort] || 0) ||
+			compareRecipesByName(recipeA, recipeB);
 	}
 
 	return compareRecipesByName(recipeA, recipeB);
