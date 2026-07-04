@@ -1,4 +1,4 @@
-const DATA_VERSION = '20260704k';
+const DATA_VERSION = '20260705a';
 const DATA_URL = `data/lookup.json?v=${DATA_VERSION}`;
 
 const state = {
@@ -1150,7 +1150,7 @@ function renderRecipeMeta(recipe) {
 	const fragment = document.createDocumentFragment();
 	const metaItems = [
 		['Priority', recipe.priority],
-		['Cook', recipe.cooktime],
+		['Cooktime', recipe.cooktime],
 	];
 
 	for (const [label, value] of metaItems) {
